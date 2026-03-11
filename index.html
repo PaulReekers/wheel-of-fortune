@@ -46,7 +46,7 @@
     <button class="bulk-toggle" id="bulkToggle" onclick="toggleBulk()">▼ Paste total list</button>
 
     <div class="bulk-area" id="bulkArea">
-      <textarea id="bulkInput" placeholder="Paste your names here, one per line:&#10;&#10;Alice&#10;Bob&#10;Charlie&#10;Diana"></textarea>
+      <textarea id="bulkInput" placeholder="Paste your names here, one per line:&#10;&#10;Paul&#10;Frank&#10;Guido&#10;Anke"></textarea>
       <div class="bulk-row">
         <button class="btn-bulk-add" onclick="addBulk()">+ Add all</button>
         <button class="btn-bulk-clear" onclick="clearBulk()">Clear</button>
@@ -55,6 +55,15 @@
 
     <ul class="names-list" id="namesList"></ul>
     <p class="status-msg" id="statusMsg"></p>
+
+    <!-- Past participants -->
+    <div class="past-section" id="pastSection">
+      <div class="past-header">
+        <span class="past-title">✓ Past participants</span>
+        <button class="btn-clear-past" onclick="clearPast()">Clear</button>
+      </div>
+      <ol class="past-list" id="pastList"></ol>
+    </div>
   </div>
 
 </div>

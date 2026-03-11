@@ -6,10 +6,12 @@ const COLORS = [
   '#1abc9c','#e67e22','#e91e63','#00bcd4','#8bc34a',
   '#ff5722','#607d8b','#673ab7','#4caf50','#ff9800'
 ];
-const STORAGE_KEY = 'wof_names_v1';
+const STORAGE_KEY         = 'wof_names_v1';
+const STORAGE_KEY_REMOVED = 'wof_removed_v1';
 
 /* ── STATE ── */
 let names      = [];
+let removed    = [];     // past participants (removed from wheel)
 let angle      = 0;      // current wheel rotation in radians
 let spinning   = false;
 let lastWinner = -1;     // index of last winner (for removal)
@@ -33,16 +35,28 @@ const modalName = document.getElementById('modalName');
       : [];
   } catch { names = []; }
 
+  try {
+    const storedRemoved = JSON.parse(localStorage.getItem(STORAGE_KEY_REMOVED) || '[]');
+    removed = Array.isArray(storedRemoved)
+      ? storedRemoved.filter(n => typeof n === 'string' && n.trim().length > 0)
+      : [];
+  } catch { removed = []; }
+
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
   window.addEventListener('resize', debounce(resize, 150));
 
   resize();
   renderList();
+  renderRemoved();
 })();
 
 /* ── DATA ── */
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+}
+
+function saveRemoved() {
+  localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify(removed));
 }
 
 function addName() {
@@ -316,12 +330,41 @@ function closeModal() {
 
 function removeWinner() {
   if (lastWinner < 0 || lastWinner >= names.length) { closeModal(); return; }
-  names.splice(lastWinner, 1);
+  const [name] = names.splice(lastWinner, 1);
   lastWinner = -1;
+  removed.push(name);
   save();
+  saveRemoved();
   renderList();
+  renderRemoved();
   drawWheel();
   closeModal();
+}
+
+/* ── PAST PARTICIPANTS ── */
+function renderRemoved() {
+  const section  = document.getElementById('pastSection');
+  const pastList = document.getElementById('pastList');
+
+  if (removed.length === 0) {
+    section.classList.remove('visible');
+    return;
+  }
+
+  section.classList.add('visible');
+  pastList.innerHTML = '';
+
+  removed.forEach(name => {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="past-name" title="${esc(name)}">${esc(name)}</span>`;
+    pastList.appendChild(li);
+  });
+}
+
+function clearPast() {
+  removed = [];
+  saveRemoved();
+  renderRemoved();
 }
 
 function overlayClick(e) {

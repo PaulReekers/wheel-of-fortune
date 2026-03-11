@@ -420,6 +420,84 @@ canvas#wheel {
   background: rgba(255,68,68,0.08);
 }
 
+/* ── PAST PARTICIPANTS ── */
+.past-section {
+  display: none;
+  margin-top: 18px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding-top: 14px;
+}
+
+.past-section.visible { display: block; }
+
+.past-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.past-title {
+  font-size: 0.78rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.4);
+}
+
+.btn-clear-past {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.72rem;
+  font-family: inherit;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: color .2s, border-color .2s;
+}
+
+.btn-clear-past:hover {
+  color: rgba(255,255,255,0.7);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.past-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  counter-reset: past-counter;
+}
+
+.past-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.03);
+  border-left: 3px solid rgba(255,215,0,0.35);
+  animation: fadeSlide .22s ease;
+  counter-increment: past-counter;
+}
+
+.past-list li::before {
+  content: counter(past-counter);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255,215,0,0.5);
+  min-width: 14px;
+  text-align: right;
+}
+
+.past-name {
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── RESPONSIVE ── */
 @media (max-width: 680px) {
   .names-panel { width: 100%; max-width: 440px; }
