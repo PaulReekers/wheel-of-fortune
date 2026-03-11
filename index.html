@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wheel of Fortune</title>
+  <link rel="icon" type="image/png" href="favicon-96x96.png" sizes="96x96" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="shortcut icon" href="favicon.ico" />
+  <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="Fortune" />
+  <link rel="manifest" href="site.webmanifest" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(160deg, #0f0c29, #302b63, #24243e);
+      min-height: 100vh;
+      color: #fff;
+      padding-bottom: 50px;
+    }
+
+    header {
+      text-align: center;
+      padding: 28px 20px 14px;
+    }
+
+    header h1 {
+      font-size: clamp(1.6rem, 5vw, 2.8rem);
+      color: #FFD700;
+      text-shadow: 0 0 24px rgba(255,215,0,0.5), 0 2px 4px rgba(0,0,0,0.5);
+      letter-spacing: 4px;
+      font-weight: 800;
+    }
+
+    header p {
+      color: rgba(255,255,255,0.38);
+      font-size: 0.85rem;
+      margin-top: 6px;
+      letter-spacing: 1px;
+    }
+
+    .main {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 36px;
+      padding: 20px 20px 0;
+      max-width: 1080px;
+      margin: 0 auto;
+      flex-wrap: wrap;
+    }
+
+    /* ── WHEEL ── */
+    .wheel-section {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      flex-shrink: 0;
+    }
+
+    .wheel-wrapper {
+      position: relative;
+      padding-top: 24px;
+    }
+
+    /* Fixed downward pointer at top of wheel */
+    .pointer {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 16px solid transparent;
+      border-right: 16px solid transparent;
+      border-top: 32px solid #FFD700;
+      filter: drop-shadow(0 0 8px rgba(255,215,0,0.9));
+      z-index: 5;
+    }
+
+    canvas#wheel {
+      display: block;
+      border-radius: 50%;
+      box-shadow:
+        0 0 0 5px rgba(255,215,0,0.25),
+        0 0 0 10px rgba(255,215,0,0.08),
+        0 18px 55px rgba(0,0,0,0.6);
+    }
+
+    .spin-btn {
+      padding: 14px 62px;
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 5px 25px rgba(255,140,0,0.5);
+      transition: transform .2s, box-shadow .2s, opacity .2s;
+      user-select: none;
+      font-family: inherit;
+    }
+
+    .spin-btn:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 9px 35px rgba(255,140,0,0.7);
+    }
+
+    .spin-btn:active:not(:disabled) { transform: translateY(-1px); }
+    .spin-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+    /* ── NAMES PANEL ── */
+    .names-panel {
+      width: 300px;
+      flex-shrink: 0;
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 22px;
+    }
+
+    .names-panel h2 {
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: #FFD700;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .input-row input {
+      flex: 1;
+      min-width: 0;
+      padding: 10px 13px;
+      background: rgba(255,255,255,0.09);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .input-row input::placeholder { color: rgba(255,255,255,0.3); }
+    .input-row input:focus { border-color: #FFD700; }
+
+    .btn-add {
+      padding: 10px 14px;
+      background: linear-gradient(135deg, #4ECDC4, #44B4AC);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    .btn-add:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(78,205,196,0.4);
+    }
+
+    .names-list {
+      list-style: none;
+      max-height: 370px;
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+
+    .names-list::-webkit-scrollbar { width: 3px; }
+    .names-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 2px; }
+    .names-list::-webkit-scrollbar-thumb { background: #FFD700; border-radius: 2px; }
+
+    .names-list li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 9px 11px;
+      margin-bottom: 6px;
+      border-radius: 9px;
+      background: rgba(255,255,255,0.06);
+      border-left: 4px solid transparent;
+      animation: fadeSlide .22s ease;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateX(-12px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+
+    .name-inner { display: flex; align-items: center; gap: 9px; overflow: hidden; min-width: 0; }
+
+    .color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .name-label {
+      font-size: 0.88rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-del {
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      color: rgba(255,90,90,0.5);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 6px;
+      line-height: 1;
+      font-family: inherit;
+      transition: color .15s, background .15s;
+    }
+
+    .btn-del:hover { color: #ff4444; background: rgba(255,0,0,0.1); }
+
+    .status-msg {
+      margin-top: 12px;
+      text-align: center;
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .status-msg.warn { color: #ff8a80; }
+
+    /* ── BULK ADD ── */
+    .bulk-toggle {
+      width: 100%;
+      background: none;
+      border: 1px dashed rgba(255,255,255,0.2);
+      border-radius: 8px;
+      color: rgba(255,255,255,0.45);
+      font-size: 0.78rem;
+      font-family: inherit;
+      padding: 6px;
+      cursor: pointer;
+      margin-bottom: 14px;
+      transition: color .2s, border-color .2s;
+    }
+
+    .bulk-toggle:hover { color: #FFD700; border-color: rgba(255,215,0,0.4); }
+
+    .bulk-area {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .bulk-area.open { display: flex; }
+
+    .bulk-area textarea {
+      width: 100%;
+      height: 110px;
+      padding: 10px 13px;
+      background: rgba(255,255,255,0.09);
+      border: 1.5px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      resize: vertical;
+      transition: border-color .2s;
+    }
+
+    .bulk-area textarea::placeholder { color: rgba(255,255,255,0.3); }
+    .bulk-area textarea:focus { border-color: #FFD700; }
+
+    .bulk-area .bulk-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-bulk-add {
+      flex: 1;
+      padding: 9px;
+      background: linear-gradient(135deg, #4ECDC4, #44B4AC);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    .btn-bulk-add:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(78,205,196,0.4);
+    }
+
+    .btn-bulk-clear {
+      padding: 9px 13px;
+      background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.5);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      cursor: pointer;
+      transition: color .2s, background .2s;
+    }
+
+    .btn-bulk-clear:hover { color: #fff; background: rgba(255,255,255,0.14); }
+
+    /* ── WINNER MODAL ── */
+    .overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .overlay.open { display: flex; }
+
+    .modal {
+      background: linear-gradient(150deg, #1f1b4e, #16213e);
+      border: 2px solid #FFD700;
+      border-radius: 22px;
+      padding: 48px 55px;
+      text-align: center;
+      max-width: min(480px, 100%);
+      width: 100%;
+      box-shadow: 0 0 80px rgba(255,215,0,0.25), 0 30px 60px rgba(0,0,0,0.5);
+      animation: popIn .45s cubic-bezier(.34,1.56,.64,1);
+    }
+
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.35) rotate(-8deg); }
+      to   { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .modal-icon { font-size: 3.8rem; display: block; margin-bottom: 10px; }
+
+    .modal-label {
+      font-size: 0.8rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 8px;
+    }
+
+    .modal-name {
+      font-size: clamp(1.8rem, 6vw, 2.6rem);
+      font-weight: 900;
+      color: #FFD700;
+      text-shadow: 0 0 28px rgba(255,215,0,0.6);
+      margin-bottom: 32px;
+      word-break: break-word;
+      line-height: 1.2;
+    }
+
+    .modal-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .btn-close {
+      padding: 12px 45px;
+      background: linear-gradient(135deg, #FFD700, #FF8C00);
+      color: #1a1a2e;
+      border: none;
+      border-radius: 50px;
+      font-size: 0.9rem;
+      font-weight: 800;
+      font-family: inherit;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    .btn-close:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 22px rgba(255,140,0,0.5);
+    }
+
+    .btn-remove {
+      padding: 9px 30px;
+      background: none;
+      color: rgba(255,100,100,0.7);
+      border: 1.5px solid rgba(255,100,100,0.35);
+      border-radius: 50px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-family: inherit;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color .2s, border-color .2s, background .2s;
+    }
+
+    .btn-remove:hover {
+      color: #ff4444;
+      border-color: rgba(255,68,68,0.6);
+      background: rgba(255,68,68,0.08);
+    }
+
+    @media (max-width: 680px) {
+      .names-panel { width: 100%; max-width: 440px; }
+      .modal { padding: 35px 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Wheel of Fortune</h1>
+  <p>Add participants and spin the wheel!</p>
+</header>
+
+<div class="main">
+
+  <div class="wheel-section">
+    <div class="wheel-wrapper">
+      <div class="pointer"></div>
+      <canvas id="wheel" width="440" height="440"></canvas>
+    </div>
+    <button class="spin-btn" id="spinBtn" onclick="spin()">Spin!</button>
+  </div>
+
+  <div class="names-panel">
+    <h2>Participants</h2>
+    <div class="input-row">
+      <input type="text" id="nameInput" placeholder="Enter name..." maxlength="25" autocomplete="off">
+      <button class="btn-add" onclick="addName()">+ Add</button>
+    </div>
+
+    <button class="bulk-toggle" id="bulkToggle" onclick="toggleBulk()">▼ Paste total list</button>
+
+    <div class="bulk-area" id="bulkArea">
+      <textarea id="bulkInput" placeholder="Paste your names here, one per line:&#10;&#10;Jan&#10;Piet&#10;Klaas&#10;Marie"></textarea>
+      <div class="bulk-row">
+        <button class="btn-bulk-add" onclick="addBulk()">+ Add all</button>
+        <button class="btn-bulk-clear" onclick="clearBulk()">Clear</button>
+      </div>
+    </div>
+
+    <ul class="names-list" id="namesList"></ul>
+    <p class="status-msg" id="statusMsg"></p>
+  </div>
+
+</div>
+
+<!-- Winner modal -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal" id="modal">
+    <p class="modal-label">The winner is</p>
+    <div class="modal-name" id="modalName"></div>
+    <div class="modal-buttons">
+      <button class="btn-close" onclick="closeModal()">Keep & Close</button>
+      <button class="btn-remove" onclick="removeWinner()">✕ Remove from wheel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ── CONSTANTS ── */
+const COLORS = [
+  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
+  '#1abc9c','#e67e22','#e91e63','#00bcd4','#8bc34a',
+  '#ff5722','#607d8b','#673ab7','#4caf50','#ff9800'
+];
+const STORAGE_KEY = 'wof_names_v1';
+
+/* ── STATE ── */
+let names      = [];
+let angle      = 0;      // current wheel rotation in radians
+let spinning   = false;
+let lastWinner = -1;     // index of last winner (for removal)
+
+/* ── DOM ── */
+const canvas    = document.getElementById('wheel');
+const ctx       = canvas.getContext('2d');
+const spinBtn   = document.getElementById('spinBtn');
+const nameInput = document.getElementById('nameInput');
+const namesList = document.getElementById('namesList');
+const statusMsg = document.getElementById('statusMsg');
+const overlay   = document.getElementById('overlay');
+const modalName = document.getElementById('modalName');
+
+/* ── INIT ── */
+(function init() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    names = Array.isArray(stored)
+      ? stored.filter(n => typeof n === 'string' && n.trim().length > 0)
+      : [];
+  } catch { names = []; }
+
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
+  window.addEventListener('resize', debounce(resize, 150));
+
+  resize();
+  renderList();
+})();
+
+/* ── DATA ── */
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+}
+
+function addName() {
+  const v = nameInput.value.trim();
+  if (!v) { nameInput.focus(); return; }
+  names.push(v);
+  nameInput.value = '';
+  nameInput.focus();
+  save();
+  renderList();
+  drawWheel();
+}
+
+/* ── BULK ADD ── */
+function toggleBulk() {
+  const area   = document.getElementById('bulkArea');
+  const toggle = document.getElementById('bulkToggle');
+  const open   = area.classList.toggle('open');
+  toggle.textContent = open ? '▲ Paste total list' : '▼ Paste total list';
+  if (open) document.getElementById('bulkInput').focus();
+}
+
+function addBulk() {
+  const raw   = document.getElementById('bulkInput').value;
+  const added = raw
+    .split('\n')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && s.length <= 25);
+
+  if (added.length === 0) return;
+
+  names.push(...added);
+  save();
+  renderList();
+  drawWheel();
+
+  // Close bulk area and reset textarea
+  document.getElementById('bulkInput').value = '';
+  document.getElementById('bulkArea').classList.remove('open');
+  document.getElementById('bulkToggle').textContent = '▼ Paste total list';
+}
+
+function clearBulk() {
+  document.getElementById('bulkInput').value = '';
+  document.getElementById('bulkInput').focus();
+}
+
+function removeName(i) {
+  names.splice(i, 1);
+  save();
+  renderList();
+  drawWheel();
+}
+
+/* ── LIST UI ── */
+function renderList() {
+  namesList.innerHTML = '';
+
+  names.forEach((name, i) => {
+    const color = COLORS[i % COLORS.length];
+    const li = document.createElement('li');
+    li.style.borderLeftColor = color;
+    li.innerHTML = `
+      <div class="name-inner">
+        <span class="color-dot" style="background:${color}"></span>
+        <span class="name-label" title="${esc(name)}">${esc(name)}</span>
+      </div>
+      <button class="btn-del" onclick="removeName(${i})" aria-label="Verwijder">✕</button>
+    `;
+    namesList.appendChild(li);
+  });
+
+  const n = names.length;
+  if (n === 0) {
+    statusMsg.textContent = 'Add at least 2 names.';
+    statusMsg.className = 'status-msg warn';
+  } else if (n === 1) {
+    statusMsg.textContent = '1 participant — add at least 1 more.';
+    statusMsg.className = 'status-msg warn';
+  } else {
+    statusMsg.textContent = `${n} participants`;
+    statusMsg.className = 'status-msg';
+  }
+
+  spinBtn.disabled = n < 2 || spinning;
+}
+
+function esc(s) {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ── CANVAS DRAW ── */
+function resize() {
+  const size = Math.min(window.innerWidth - 48, 440);
+  canvas.width  = size;
+  canvas.height = size;
+  drawWheel();
+}
+
+function drawWheel() {
+  const W = canvas.width, H = canvas.height;
+  const cx = W / 2, cy = H / 2;
+  const r  = Math.min(cx, cy) - 8;
+
+  ctx.clearRect(0, 0, W, H);
+
+  if (names.length === 0) {
+    drawEmpty(cx, cy, r);
+    return;
+  }
+
+  if (names.length === 1) {
+    drawSingleSegment(cx, cy, r);
+    return;
+  }
+
+  const seg = (2 * Math.PI) / names.length;
+
+  for (let i = 0; i < names.length; i++) {
+    const a0    = angle + i * seg;
+    const a1    = a0 + seg;
+    const color = COLORS[i % COLORS.length];
+
+    // Segment fill
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, r, a0, a1);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Radial text
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(a0 + seg / 2);
+    ctx.textAlign    = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor  = 'rgba(0,0,0,0.7)';
+    ctx.shadowBlur   = 4;
+
+    const fs = Math.max(10, Math.min(16, Math.floor(r * seg / 7)));
+    ctx.font      = `bold ${fs}px Segoe UI, sans-serif`;
+    ctx.fillStyle = '#fff';
+
+    let txt = names[i];
+    const maxW = r * 0.72;
+    while (ctx.measureText(txt).width > maxW && txt.length > 2) {
+      txt = txt.slice(0, -1);
+    }
+    if (txt.length < names[i].length) txt += '…';
+
+    ctx.fillText(txt, r - 12, 0);
+    ctx.restore();
+  }
+
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth   = 4;
+  ctx.stroke();
+
+  drawHub(cx, cy);
+}
+
+function drawEmpty(cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.fillStyle   = 'rgba(255,255,255,0.03)';
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.lineWidth   = 3;
+  ctx.stroke();
+
+  ctx.fillStyle    = 'rgba(255,255,255,0.22)';
+  ctx.font         = '15px Segoe UI, sans-serif';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Voeg namen toe', cx, cy - 12);
+  ctx.fillText('om te beginnen', cx, cy + 12);
+}
+
+function drawSingleSegment(cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.fillStyle   = COLORS[0];
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.lineWidth   = 4;
+  ctx.stroke();
+
+  ctx.save();
+  ctx.shadowColor  = 'rgba(0,0,0,0.7)';
+  ctx.shadowBlur   = 4;
+  ctx.fillStyle    = '#fff';
+  ctx.font         = 'bold 18px Segoe UI, sans-serif';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(names[0], cx, cy);
+  ctx.restore();
+
+  drawHub(cx, cy);
+}
+
+function drawHub(cx, cy) {
+  const layers = [[24,'#fff'],[17,'#FFD700'],[8,'#1a1a2e']];
+  layers.forEach(([rad, fill]) => {
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, 2 * Math.PI);
+    ctx.fillStyle = fill;
+    ctx.fill();
+  });
+}
+
+/* ── SPIN ── */
+function spin() {
+  if (spinning || names.length < 2) return;
+
+  spinning = true;
+  spinBtn.disabled = true;
+
+  const n          = names.length;
+  const seg        = (2 * Math.PI) / n;
+  const winnerIdx  = Math.floor(Math.random() * n);
+
+  // Center of winner's segment (in wheel-local coords) should land at -π/2 (top/pointer)
+  const winnerCenter = winnerIdx * seg + seg / 2;
+  let targetAngle    = -Math.PI / 2 - winnerCenter;
+
+  // Forward delta from current angle
+  let delta = (targetAngle - angle) % (2 * Math.PI);
+  if (delta < 0) delta += 2 * Math.PI;
+
+  // Add full rotations for drama (6–10 spins)
+  delta += (6 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
+
+  const startAngle = angle;
+  const duration   = 5000 + Math.random() * 2000; // 5–7 seconds
+  const t0         = performance.now();
+
+  function frame(t) {
+    const p     = Math.min((t - t0) / duration, 1);
+    const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+
+    angle = startAngle + delta * eased;
+    drawWheel();
+
+    if (p < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      // Normalize angle to [0, 2π) to prevent float accumulation
+      angle    = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      spinning   = false;
+      lastWinner = winnerIdx;
+      spinBtn.disabled = (names.length < 2);
+      setTimeout(() => showWinner(names[winnerIdx]), 300);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+/* ── MODAL ── */
+function showWinner(name) {
+  modalName.textContent = name;
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  overlay.classList.remove('open');
+}
+
+function removeWinner() {
+  if (lastWinner < 0 || lastWinner >= names.length) { closeModal(); return; }
+  names.splice(lastWinner, 1);
+  lastWinner = -1;
+  save();
+  renderList();
+  drawWheel();
+  closeModal();
+}
+
+function overlayClick(e) {
+  if (e.target === overlay) closeModal();
+}
+
+/* ── UTILS ── */
+function debounce(fn, ms) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+</script>
+</body>
+</html>
