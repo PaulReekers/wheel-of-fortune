@@ -1,0 +1,11 @@
+# Claude
+.claude/
+
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+*.suo
+*.user
