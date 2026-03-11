@@ -270,6 +270,51 @@ function drawHub(cx, cy) {
   });
 }
 
+/* ── AUDIO ── */
+let audioCtx = null;
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playTick(volume) {
+  try {
+    const ctx      = getAudioCtx();
+    const now      = ctx.currentTime;
+    const duration = 0.045;
+
+    // Short noise burst shaped into a click
+    const samples = Math.floor(ctx.sampleRate * duration);
+    const buffer  = ctx.createBuffer(1, samples, ctx.sampleRate);
+    const data    = buffer.getChannelData(0);
+    for (let i = 0; i < samples; i++) {
+      // White noise that decays sharply → click sound
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / samples, 6);
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+
+    // High-pass filter: remove low rumble, keep crisp click
+    const filter       = ctx.createBiquadFilter();
+    filter.type        = 'highpass';
+    filter.frequency.value = 1200;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(volume * 0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(now);
+  } catch (_) { /* audio unavailable */ }
+}
+
 /* ── SPIN ── */
 function spin() {
   if (spinning || names.length < 2) return;
@@ -289,12 +334,13 @@ function spin() {
   let delta = (targetAngle - angle) % (2 * Math.PI);
   if (delta < 0) delta += 2 * Math.PI;
 
-  // Add full rotations for drama (6–10 spins)
-  delta += (6 + Math.floor(Math.random() * 5)) * 2 * Math.PI;
+  // Add full rotations (3–5 spins)
+  delta += (3 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
 
   const startAngle = angle;
-  const duration   = 5000 + Math.random() * 2000; // 5–7 seconds
+  const duration   = 4000 + Math.random() * 1500; // 4–5.5 seconds
   const t0         = performance.now();
+  let   prevBoundary = Math.floor(startAngle / seg);
 
   function frame(t) {
     const p     = Math.min((t - t0) / duration, 1);
@@ -302,6 +348,18 @@ function spin() {
 
     angle = startAngle + delta * eased;
     drawWheel();
+
+    // Play a tick for every segment boundary crossed this frame
+    const currBoundary = Math.floor(angle / seg);
+    const crossings    = Math.min(currBoundary - prevBoundary, 4); // cap to avoid audio burst
+    if (crossings > 0) {
+      const volume = Math.max(0.1, 1 - p * 0.88); // quieter as wheel slows
+      for (let c = 0; c < crossings; c++) {
+        // Stagger multiple ticks slightly so they don't overlap
+        setTimeout(() => playTick(volume), c * 12);
+      }
+    }
+    prevBoundary = currBoundary;
 
     if (p < 1) {
       requestAnimationFrame(frame);
