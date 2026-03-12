@@ -4,6 +4,7 @@
   --wof-gold:           #FFD700;
   --wof-dark:           #1a1a2e;
   --wof-font:           Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+  --wof-name-size:      1;    /* font scale for segment names: 1 = default, 1.5 = 50% bigger */
 
   /* Canvas — segment styling */
   --wof-seg-stroke:     rgba(255,255,255,0.4);

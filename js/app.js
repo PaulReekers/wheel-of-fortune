@@ -19,6 +19,7 @@ function loadTheme() {
     gold:        v('--wof-gold'),
     dark:        v('--wof-dark'),
     font:        v('--wof-font') || 'Segoe UI, sans-serif',
+    nameSize:    parseFloat(v('--wof-name-size')) || 1,
     segStroke:   v('--wof-seg-stroke'),
     ringStroke:  v('--wof-ring-stroke'),
     textColor:   v('--wof-text-color'),
@@ -214,7 +215,7 @@ function resize() {
 function drawWheel() {
   const W = canvas.width, H = canvas.height;
   const cx = W / 2, cy = H / 2;
-  const r  = Math.min(cx, cy); // leaves room for the right-side pointer
+  const r  = Math.min(cx, cy) - 30; // leaves room for the right-side pointer
 
   ctx.clearRect(0, 0, W, H);
 
@@ -248,7 +249,7 @@ function drawWheel() {
     ctx.shadowColor  = THEME.textShadow;
     ctx.shadowBlur   = 4;
 
-    const fs = Math.max(10, Math.min(16, Math.floor(r * seg / 7)));
+    const fs = Math.max(10, Math.round(Math.min(r * seg / 7, r * 0.07) * THEME.nameSize));
     ctx.font      = `bold ${fs}px ${THEME.font}`;
     ctx.fillStyle = THEME.textColor;
 
@@ -279,7 +280,7 @@ function drawHint(cx, cy) {
   if (hasSpun || spinning || names.length < 2) return;
 
   const text  = 'Click to spin';
-  const fSize = 13;
+  const fSize = 20;
   ctx.save();
   ctx.font = `bold ${fSize}px ${THEME.font}`;
 
@@ -335,11 +336,11 @@ function drawPointer(cx, cy, r) {
   ctx.shadowBlur    = 6;
   ctx.shadowOffsetX = 1;
 
-  // Left-pointing triangle: tip touches wheel rim, base sticks out to the right
+  // Left-pointing triangle: tip overlaps into the wheel, base sticks out to the right
   ctx.beginPath();
-  ctx.moveTo(r + 4,   0);   // tip (left, at wheel rim)
-  ctx.lineTo(r + 26, -12);  // top-right
-  ctx.lineTo(r + 26,  12);  // bottom-right
+  ctx.moveTo(r - 18,  0);   // tip — 18px inside the rim
+  ctx.lineTo(r + 18, -13);  // top-right
+  ctx.lineTo(r + 18,  13);  // bottom-right
   ctx.closePath();
 
   ctx.fillStyle = color;
@@ -538,7 +539,7 @@ function spin() {
       lastWinner = winnerIdx;
       updateCursor();
       setTimeout(() => showWinner(names[winnerIdx]), 300);
-      startIdleRotation();
+      // idle rotation resumes only after the modal is dismissed (see closeModal)
     }
   }
 
@@ -553,6 +554,7 @@ function showWinner(name) {
 
 function closeModal() {
   overlay.classList.remove('open');
+  startIdleRotation(); // wheel resumes slow rotation once popup is dismissed
 }
 
 function removeWinner() {
