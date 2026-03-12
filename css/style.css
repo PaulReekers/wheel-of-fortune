@@ -58,36 +58,23 @@ header p {
 canvas#wheel {
   display: block;
   border-radius: 50%;
+  cursor: pointer;
   box-shadow:
     0 0 0 5px rgba(255,215,0,0.25),
     0 0 0 10px rgba(255,215,0,0.08),
     0 18px 55px rgba(0,0,0,0.6);
+  transition: box-shadow .3s;
 }
 
-.spin-btn {
-  padding: 14px 62px;
-  font-size: 1.15rem;
-  font-weight: 800;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  background: linear-gradient(135deg, #FFD700, #FF8C00);
-  color: #1a1a2e;
-  border: none;
-  border-radius: 50px;
-  cursor: pointer;
-  box-shadow: 0 5px 25px rgba(255,140,0,0.5);
-  transition: transform .2s, box-shadow .2s, opacity .2s;
-  user-select: none;
-  font-family: inherit;
+canvas#wheel:hover {
+  box-shadow:
+    0 0 0 5px rgba(255,215,0,0.45),
+    0 0 0 10px rgba(255,215,0,0.15),
+    0 18px 55px rgba(0,0,0,0.6);
 }
 
-.spin-btn:hover:not(:disabled) {
-  transform: translateY(-3px);
-  box-shadow: 0 9px 35px rgba(255,140,0,0.7);
-}
-
-.spin-btn:active:not(:disabled) { transform: translateY(-1px); }
-.spin-btn:disabled { opacity: 0.38; cursor: not-allowed; }
+canvas#wheel.not-allowed { cursor: not-allowed; }
+canvas#wheel.spinning    { cursor: default; }
 
 /* ── NAMES PANEL ── */
 .names-panel {

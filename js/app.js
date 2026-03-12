@@ -16,11 +16,11 @@ let angle      = 0;      // current wheel rotation in radians
 let spinning   = false;
 let lastWinner = -1;     // index of last winner (for removal)
 let idleRaf    = null;   // requestAnimationFrame handle for idle rotation
+let hasSpun    = false;  // tracks whether wheel has been spun (hides hint after first spin)
 
 /* ── DOM ── */
 const canvas    = document.getElementById('wheel');
 const ctx       = canvas.getContext('2d');
-const spinBtn   = document.getElementById('spinBtn');
 const nameInput = document.getElementById('nameInput');
 const namesList = document.getElementById('namesList');
 const statusMsg = document.getElementById('statusMsg');
@@ -44,6 +44,7 @@ const modalName = document.getElementById('modalName');
   } catch { removed = []; }
 
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
+  canvas.addEventListener('click', () => spin());
   window.addEventListener('resize', debounce(resize, 150));
 
   resize();
@@ -143,7 +144,7 @@ function renderList() {
     statusMsg.className = 'status-msg';
   }
 
-  spinBtn.disabled = n < 2 || spinning;
+  updateCursor();
 }
 
 function esc(s) {
@@ -223,6 +224,47 @@ function drawWheel() {
 
   drawHub(cx, cy);
   drawPointer(cx, cy, r);
+  drawHint(cx, cy);
+}
+
+function drawHint(cx, cy) {
+  if (hasSpun || spinning || names.length < 2) return;
+
+  const text  = '🖱 Click to spin';
+  const fSize = 13;
+  ctx.save();
+  ctx.font = `bold ${fSize}px Segoe UI, sans-serif`;
+
+  const tw   = ctx.measureText(text).width;
+  const padX = 16, padY = 9;
+  const bw   = tw + padX * 2;
+  const bh   = fSize + padY * 2;
+  const bx   = cx - bw / 2;
+  const by   = cy - bh / 2;
+  const br   = 10; // border radius
+
+  // Rounded rectangle background
+  ctx.fillStyle = 'rgba(10,8,30,0.72)';
+  ctx.beginPath();
+  ctx.moveTo(bx + br, by);
+  ctx.lineTo(bx + bw - br, by);
+  ctx.quadraticCurveTo(bx + bw, by,      bx + bw, by + br);
+  ctx.lineTo(bx + bw, by + bh - br);
+  ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
+  ctx.lineTo(bx + br, by + bh);
+  ctx.quadraticCurveTo(bx, by + bh,      bx, by + bh - br);
+  ctx.lineTo(bx, by + br);
+  ctx.quadraticCurveTo(bx, by,           bx + br, by);
+  ctx.closePath();
+  ctx.fill();
+
+  // Text
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle    = 'rgba(255,255,255,0.92)';
+  ctx.fillText(text, cx, cy);
+
+  ctx.restore();
 }
 
 function drawPointer(cx, cy, r) {
@@ -315,6 +357,13 @@ function drawHub(cx, cy) {
   });
 }
 
+/* ── CURSOR ── */
+function updateCursor() {
+  canvas.classList.remove('spinning', 'not-allowed');
+  if (spinning)          canvas.classList.add('spinning');
+  else if (names.length < 2) canvas.classList.add('not-allowed');
+}
+
 /* ── IDLE ROTATION ── */
 const IDLE_SPEED = 0.00018; // radians per ms ≈ one full rotation every ~35 seconds
 
@@ -385,8 +434,9 @@ function spin() {
   if (spinning || names.length < 2) return;
 
   spinning = true;
-  spinBtn.disabled = true;
+  hasSpun  = true;
   if (idleRaf) { cancelAnimationFrame(idleRaf); idleRaf = null; }
+  updateCursor();
 
   const n         = names.length;
   const seg       = (2 * Math.PI) / n;
@@ -434,7 +484,7 @@ function spin() {
       angle      = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
       spinning   = false;
       lastWinner = winnerIdx;
-      spinBtn.disabled = (names.length < 2);
+      updateCursor();
       setTimeout(() => showWinner(names[winnerIdx]), 300);
       startIdleRotation();
     }
