@@ -15,6 +15,7 @@ let removed    = [];     // past participants (removed from wheel)
 let angle      = 0;      // current wheel rotation in radians
 let spinning   = false;
 let lastWinner = -1;     // index of last winner (for removal)
+let idleRaf    = null;   // requestAnimationFrame handle for idle rotation
 
 /* ── DOM ── */
 const canvas    = document.getElementById('wheel');
@@ -48,6 +49,7 @@ const modalName = document.getElementById('modalName');
   resize();
   renderList();
   renderRemoved();
+  startIdleRotation();
 })();
 
 /* ── DATA ── */
@@ -270,6 +272,26 @@ function drawHub(cx, cy) {
   });
 }
 
+/* ── IDLE ROTATION ── */
+const IDLE_SPEED = 0.00018; // radians per ms ≈ one full rotation every ~35 seconds
+
+function startIdleRotation() {
+  if (idleRaf) return; // already running
+  let lastTime = null;
+
+  function idleFrame(t) {
+    if (spinning) { idleRaf = null; return; } // hand off to spin animation
+    if (lastTime !== null) {
+      angle = (angle + IDLE_SPEED * (t - lastTime)) % (2 * Math.PI);
+      drawWheel();
+    }
+    lastTime = t;
+    idleRaf  = requestAnimationFrame(idleFrame);
+  }
+
+  idleRaf = requestAnimationFrame(idleFrame);
+}
+
 /* ── AUDIO ── */
 let audioCtx = null;
 
@@ -321,6 +343,7 @@ function spin() {
 
   spinning = true;
   spinBtn.disabled = true;
+  if (idleRaf) { cancelAnimationFrame(idleRaf); idleRaf = null; }
 
   const n         = names.length;
   const seg       = (2 * Math.PI) / n;
@@ -370,6 +393,7 @@ function spin() {
       lastWinner = winnerIdx;
       spinBtn.disabled = (names.length < 2);
       setTimeout(() => showWinner(names[winnerIdx]), 300);
+      startIdleRotation();
     }
   }
 
