@@ -10,7 +10,9 @@
       "Bash(curl -s -o site.webmanifest \"https://realfavicongenerator.net/files/ae47ea4a-c268-4cf5-9591-f562e715b7a3/site.webmanifest\")",
       "Bash(ls -lh /Users/paul/Documents/wheel-of-fortune/favicon* /Users/paul/Documents/wheel-of-fortune/apple-touch* /Users/paul/Documents/wheel-of-fortune/web-app* /Users/paul/Documents/wheel-of-fortune/site.webmanifest)",
       "Bash(ls /Users/paul/Documents/wheel-of-fortune/favicon* /Users/paul/Documents/wheel-of-fortune/apple-touch-icon.png /Users/paul/Documents/wheel-of-fortune/site.webmanifest)",
-      "Bash(lsof -i :8080)"
+      "Bash(lsof -i :8080)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(/usr/bin/python3 -c \"import sys; print\\(sys.version\\)\")"
     ]
   }
 }

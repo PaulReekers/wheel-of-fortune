@@ -157,7 +157,16 @@ function esc(s) {
 
 /* ── CANVAS DRAW ── */
 function resize() {
-  const size = Math.min(window.innerWidth - 48, 440);
+  const isMobile = window.innerWidth <= 680;
+  const headerH  = (document.querySelector('header')?.offsetHeight ?? 80);
+  const vPad     = 60;              // top + bottom breathing room
+  const hPad     = isMobile ? 40 : 60; // left + right breathing room
+  const panelW   = isMobile ? 0 : 340; // panel width (300) + its right margin (20) + gap (20)
+
+  const maxH = window.innerHeight - headerH - vPad;
+  const maxW = window.innerWidth  - panelW  - hPad;
+  const size = Math.max(240, Math.min(maxH, maxW, 900));
+
   canvas.width  = size;
   canvas.height = size;
   drawWheel();
@@ -230,7 +239,7 @@ function drawWheel() {
 function drawHint(cx, cy) {
   if (hasSpun || spinning || names.length < 2) return;
 
-  const text  = '🖱 Click to spin';
+  const text  = 'Click to spin';
   const fSize = 13;
   ctx.save();
   ctx.font = `bold ${fSize}px Segoe UI, sans-serif`;

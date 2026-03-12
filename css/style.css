@@ -34,12 +34,9 @@ header p {
 .main {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  gap: 36px;
-  padding: 20px 20px 0;
-  max-width: 1080px;
-  margin: 0 auto;
-  flex-wrap: wrap;
+  align-items: center;
+  min-height: calc(100vh - 80px);
+  padding: 20px 360px 20px 20px; /* right side makes room for fixed names panel */
 }
 
 /* ── WHEEL ── */
@@ -47,7 +44,6 @@ header p {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
   flex-shrink: 0;
 }
 
@@ -78,8 +74,14 @@ canvas#wheel.spinning    { cursor: default; }
 
 /* ── NAMES PANEL ── */
 .names-panel {
+  position: fixed;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  z-index: 100;
   width: 300px;
-  flex-shrink: 0;
   background: rgba(255,255,255,0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -87,6 +89,10 @@ canvas#wheel.spinning    { cursor: default; }
   border-radius: 20px;
   padding: 22px;
 }
+
+.names-panel::-webkit-scrollbar { width: 3px; }
+.names-panel::-webkit-scrollbar-track { background: transparent; }
+.names-panel::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.35); border-radius: 2px; }
 
 .names-panel h2 {
   font-size: 0.9rem;
@@ -471,6 +477,23 @@ canvas#wheel.spinning    { cursor: default; }
 
 /* ── RESPONSIVE ── */
 @media (max-width: 680px) {
-  .names-panel { width: 100%; max-width: 440px; }
+  .main {
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 20px 30px;
+    min-height: auto;
+    gap: 24px;
+  }
+  .names-panel {
+    position: static;
+    transform: none;
+    top: auto;
+    right: auto;
+    width: 100%;
+    max-width: 440px;
+    max-height: none;
+    overflow-y: visible;
+    z-index: auto;
+  }
   .modal { padding: 35px 28px; }
 }
