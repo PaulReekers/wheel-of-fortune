@@ -165,7 +165,7 @@ function resize() {
 function drawWheel() {
   const W = canvas.width, H = canvas.height;
   const cx = W / 2, cy = H / 2;
-  const r  = Math.min(cx, cy) - 8;
+  const r  = Math.min(cx, cy) - 30; // smaller radius leaves room for right-side pointer
 
   ctx.clearRect(0, 0, W, H);
 
@@ -222,6 +222,46 @@ function drawWheel() {
   ctx.stroke();
 
   drawHub(cx, cy);
+  drawPointer(cx, cy, r);
+}
+
+function drawPointer(cx, cy, r) {
+  // Pointer on the right side (angle = 0), pointing left toward the wheel
+
+  // Determine the color of the segment currently at the pointer
+  let color = '#FFD700';
+  if (names.length >= 1) {
+    const seg  = (2 * Math.PI) / names.length;
+    const norm = ((-angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    const idx  = Math.floor(norm / seg) % names.length;
+    color = COLORS[idx % COLORS.length];
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Shadow for depth
+  ctx.shadowColor    = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur     = 6;
+  ctx.shadowOffsetX  = 1;
+
+  // Left-pointing triangle: tip touches wheel rim, base sticks out to the right
+  ctx.beginPath();
+  ctx.moveTo(r + 4,   0);   // tip (left, at wheel rim)
+  ctx.lineTo(r + 26, -12);  // top-right
+  ctx.lineTo(r + 26,  12);  // bottom-right
+  ctx.closePath();
+
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  ctx.shadowBlur    = 0;
+  ctx.shadowOffsetX = 0;
+  ctx.strokeStyle   = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth     = 2;
+  ctx.stroke();
+
+  ctx.restore();
 }
 
 function drawEmpty(cx, cy, r) {
@@ -238,6 +278,8 @@ function drawEmpty(cx, cy, r) {
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('Add names to get started', cx, cy);
+
+  drawPointer(cx, cy, r);
 }
 
 function drawSingleSegment(cx, cy, r) {
@@ -260,6 +302,7 @@ function drawSingleSegment(cx, cy, r) {
   ctx.restore();
 
   drawHub(cx, cy);
+  drawPointer(cx, cy, r);
 }
 
 function drawHub(cx, cy) {
@@ -349,9 +392,9 @@ function spin() {
   const seg       = (2 * Math.PI) / n;
   const winnerIdx = Math.floor(Math.random() * n);
 
-  // Center of winner's segment should land at -π/2 (top = pointer)
+  // Center of winner's segment should land at 0 (right = pointer)
   const winnerCenter = winnerIdx * seg + seg / 2;
-  let targetAngle    = -Math.PI / 2 - winnerCenter;
+  let targetAngle    = -winnerCenter;
 
   // Forward delta from current angle
   let delta = (targetAngle - angle) % (2 * Math.PI);

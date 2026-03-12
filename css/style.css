@@ -53,22 +53,6 @@ header p {
 
 .wheel-wrapper {
   position: relative;
-  padding-top: 24px;
-}
-
-/* Fixed downward pointer at top of wheel */
-.pointer {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 0;
-  border-left: 16px solid transparent;
-  border-right: 16px solid transparent;
-  border-top: 32px solid #FFD700;
-  filter: drop-shadow(0 0 8px rgba(255,215,0,0.9));
-  z-index: 5;
 }
 
 canvas#wheel {
