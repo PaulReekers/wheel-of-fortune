@@ -1,34 +1,53 @@
 /* ── DESIGN TOKENS ── */
 :root {
-  /* Brand colours */
-  --wof-gold:           #FFD700;
-  --wof-dark:           #1a1a2e;
-  --wof-font:           Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
-  --wof-name-size:      1;    /* font scale for segment names: 1 = default, 1.5 = 50% bigger */
+  /* Brand */
+  --wof-gold:                #FFD700;
+  --wof-dark:                #1a1a2e;
+  --wof-font:                Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
 
-  /* Canvas — segment styling */
-  --wof-seg-stroke:     rgba(255,255,255,0.4);
-  --wof-ring-stroke:    rgba(255,255,255,0.65);
-  --wof-text-color:     #ffffff;
-  --wof-text-shadow:    rgba(0,0,0,0.7);
+  /* Canvas — segment labels */
+  --wof-seg-stroke:          rgba(255,255,255,0.4);
+  --wof-seg-line-width:      1.5;
+  --wof-ring-stroke:         rgba(255,255,255,0.65);
+  --wof-ring-line-width:     4;
+  --wof-text-color:          #ffffff;
+  --wof-text-weight:         bold;
+  --wof-text-shadow:         rgba(0,0,0,0.7);
+  --wof-text-shadow-blur:    4;
+  --wof-text-align:          right;   /* textAlign for radial labels */
+  --wof-text-align-center:   center;  /* textAlign for centered text (hint, empty, single) */
+  --wof-text-baseline:       middle;  /* textBaseline for all canvas text */
+  --wof-text-offset:         12;      /* px gap between label and rim */
+  --wof-text-max-width:      0.72;    /* max label width as fraction of radius */
+  --wof-name-size:           1;       /* font scale: 1 = default, 1.5 = 50% bigger */
+
+  /* Canvas — single segment label */
+  --wof-single-size:         18;      /* font size (px) when only 1 participant */
 
   /* Canvas — hub */
-  --wof-hub-outer:      #ffffff;
-  --wof-hub-mid:        #FFD700;
-  --wof-hub-inner:      #1a1a2e;
+  --wof-hub-outer:           #ffffff;
+  --wof-hub-mid:             #FFD700;
+  --wof-hub-inner:           #1a1a2e;
+  --wof-hub-r1:              24;      /* outer ring radius */
+  --wof-hub-r2:              17;      /* middle ring radius */
+  --wof-hub-r3:              8;       /* inner dot radius */
 
   /* Canvas — pointer */
-  --wof-pointer-stroke: rgba(255,255,255,0.9);
-  --wof-pointer-shadow: rgba(0,0,0,0.5);
-
-  /* Canvas — hint pill */
-  --wof-hint-bg:        rgba(10,8,30,0.72);
-  --wof-hint-text:      rgba(255,255,255,0.92);
+  --wof-pointer-stroke:      rgba(255,255,255,0.9);
+  --wof-pointer-shadow:      rgba(0,0,0,0.5);
+  --wof-pointer-shadow-blur: 6;
+  --wof-pointer-shadow-x:    1;
+  --wof-pointer-line-width:  2;
+  --wof-pointer-overlap:     18;      /* px the tip reaches into the wheel */
+  --wof-pointer-reach:       18;      /* px the base sticks out beyond the rim */
+  --wof-pointer-height:      13;      /* half-height of the triangle */
 
   /* Canvas — empty state */
-  --wof-empty-fill:     rgba(255,255,255,0.03);
-  --wof-empty-stroke:   rgba(255,255,255,0.12);
-  --wof-empty-text:     rgba(255,255,255,0.22);
+  --wof-empty-fill:          rgba(255,255,255,0.03);
+  --wof-empty-stroke:        rgba(255,255,255,0.12);
+  --wof-empty-line-width:    3;
+  --wof-empty-text:          rgba(255,255,255,0.22);
+  --wof-empty-size:          15;      /* font size (px) */
 
   /* Segment colour palette — 15 colours (edit here to reskin the wheel) */
   --wof-c-0:  #e74c3c;
@@ -99,6 +118,27 @@ header p {
 
 .wheel-wrapper {
   position: relative;
+}
+
+/* "Click to spin" pill — centered over the canvas, toggled via JS */
+.spin-hint {
+  position: absolute;
+  top: 56%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(10,8,30,0.72);
+  color: rgba(255,255,255,0.92);
+  font-size: 20px;
+  font-weight: bold;
+  padding: 9px 16px;
+  border-radius: 10px;
+  pointer-events: none;   /* clicks pass through to the canvas */
+  white-space: nowrap;
+  transition: opacity 0.25s;
+}
+
+.spin-hint.hidden {
+  opacity: 0;
 }
 
 canvas#wheel {

@@ -10,54 +10,136 @@ let THEME  = {};   // canvas style values, populated by loadTheme()
 
 function loadTheme() {
   const v = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const n = name => parseFloat(v(name)); // shorthand for numeric vars
 
   // Segment colour palette (--wof-c-0 … --wof-c-14)
   COLORS = Array.from({ length: 15 }, (_, i) => v(`--wof-c-${i}`));
 
-  // All other canvas colours + font
+  // All canvas styles — edit values in style.css :root, not here
   THEME = {
-    gold:        v('--wof-gold'),
-    dark:        v('--wof-dark'),
-    font:        v('--wof-font') || 'Segoe UI, sans-serif',
-    nameSize:    parseFloat(v('--wof-name-size')) || 1,
-    segStroke:   v('--wof-seg-stroke'),
-    ringStroke:  v('--wof-ring-stroke'),
-    textColor:   v('--wof-text-color'),
-    textShadow:  v('--wof-text-shadow'),
-    hubOuter:    v('--wof-hub-outer'),
-    hubMid:      v('--wof-hub-mid'),
-    hubInner:    v('--wof-hub-inner'),
-    ptrStroke:   v('--wof-pointer-stroke'),
-    ptrShadow:   v('--wof-pointer-shadow'),
-    hintBg:      v('--wof-hint-bg'),
-    hintText:    v('--wof-hint-text'),
-    emptyFill:   v('--wof-empty-fill'),
-    emptyStroke: v('--wof-empty-stroke'),
-    emptyText:   v('--wof-empty-text'),
+    // Brand
+    gold:            v('--wof-gold'),
+    dark:            v('--wof-dark'),
+    font:            v('--wof-font') || 'Segoe UI, sans-serif',
+
+    // Segment labels
+    segStroke:       v('--wof-seg-stroke'),
+    segLineWidth:    n('--wof-seg-line-width'),
+    ringStroke:      v('--wof-ring-stroke'),
+    ringLineWidth:   n('--wof-ring-line-width'),
+    textColor:       v('--wof-text-color'),
+    textWeight:      v('--wof-text-weight'),
+    textShadow:      v('--wof-text-shadow'),
+    textShadowBlur:  n('--wof-text-shadow-blur'),
+    textAlign:       v('--wof-text-align'),
+    textAlignCenter: v('--wof-text-align-center'),
+    textBaseline:    v('--wof-text-baseline'),
+    textOffset:      n('--wof-text-offset'),
+    textMaxWidth:    n('--wof-text-max-width'),
+    nameSize:        n('--wof-name-size') || 1,
+
+    // Single segment label
+    singleSize:      n('--wof-single-size'),
+
+    // Hub
+    hubOuter:        v('--wof-hub-outer'),
+    hubMid:          v('--wof-hub-mid'),
+    hubInner:        v('--wof-hub-inner'),
+    hubR1:           n('--wof-hub-r1'),
+    hubR2:           n('--wof-hub-r2'),
+    hubR3:           n('--wof-hub-r3'),
+
+    // Pointer
+    ptrStroke:       v('--wof-pointer-stroke'),
+    ptrShadow:       v('--wof-pointer-shadow'),
+    ptrShadowBlur:   n('--wof-pointer-shadow-blur'),
+    ptrShadowX:      n('--wof-pointer-shadow-x'),
+    ptrLineWidth:    n('--wof-pointer-line-width'),
+    ptrOverlap:      n('--wof-pointer-overlap'),
+    ptrReach:        n('--wof-pointer-reach'),
+    ptrHeight:       n('--wof-pointer-height'),
+
+    // Empty state
+    emptyFill:       v('--wof-empty-fill'),
+    emptyStroke:     v('--wof-empty-stroke'),
+    emptyLineWidth:  n('--wof-empty-line-width'),
+    emptyText:       v('--wof-empty-text'),
+    emptySize:       n('--wof-empty-size'),
   };
 }
 
-/* ── STORAGE KEYS ── */
+/* ── CONSTANTS ────────────────────────────────────────────────────────────────
+   Magic numbers live here — not scattered through the code.
+────────────────────────────────────────────────────────────────────────────── */
 const STORAGE_KEY         = 'wof_names_v1';
 const STORAGE_KEY_REMOVED = 'wof_removed_v1';
 
+// Canvas layout
+const CANVAS_MARGIN       = 30;    // px between wheel rim and canvas edge (room for pointer)
+const CANVAS_MIN_SIZE     = 240;   // minimum canvas size in px
+const CANVAS_MAX_SIZE     = 900;   // maximum canvas size in px
+const CANVAS_PANEL_WIDTH  = 340;   // desktop panel width + its margins
+const CANVAS_BREAKPOINT   = 680;   // px — below this the panel stacks vertically
+
+// Spin animation
+const SPIN_MIN_ROTATIONS  = 3;     // minimum full rotations before stopping
+const SPIN_ROTATION_RANGE = 3;     // random extra rotations added on top (0 … range-1)
+const SPIN_MIN_DURATION   = 4000;  // ms — minimum spin duration
+const SPIN_EXTRA_DURATION = 1500;  // ms — random extra duration
+const SPIN_WINNER_DELAY   = 300;   // ms — pause before showing the winner modal
+
+// Tick sound
+const TICK_DURATION       = 0.045; // seconds — length of each click sound
+const TICK_FILTER_FREQ    = 1200;  // Hz — high-pass filter cutoff
+const TICK_GAIN_FACTOR    = 0.5;   // master gain multiplier per tick
+const TICK_VOLUME_MIN     = 0.1;   // minimum tick volume at end of spin
+const TICK_VOLUME_FADE    = 0.88;  // how fast volume fades as the wheel slows
+const TICK_MAX_CROSSINGS  = 4;     // max ticks fired per animation frame
+const TICK_STAGGER_MS     = 12;    // ms between staggered ticks in one frame
+
+// Idle rotation
+const IDLE_SPEED          = 0.00018; // rad/ms ≈ one full rotation every ~35 seconds
+
+// UI
+const RESIZE_DEBOUNCE     = 150;   // ms — debounce delay for the window resize handler
+
 /* ── STATE ── */
-let names      = [];
-let removed    = [];     // past participants (removed from wheel)
-let angle      = 0;      // current wheel rotation in radians
-let spinning   = false;
-let lastWinner = -1;     // index of last winner (for removal)
-let idleRaf    = null;   // requestAnimationFrame handle for idle rotation
-let hasSpun    = false;  // hides the "Click to spin" hint after first spin
+const state = {
+  names:      [],    // participant names currently on the wheel
+  removed:    [],    // past participants (removed after being picked)
+  angle:      0,     // current wheel rotation in radians
+  spinning:   false,
+  lastWinner: -1,    // index of the last winner (used for removal)
+  idleRaf:    null,  // requestAnimationFrame handle for idle rotation
+  hasSpun:    false, // true after the first spin — hides the "Click to spin" hint
+};
 
 /* ── DOM ── */
-const canvas    = document.getElementById('wheel');
-const ctx       = canvas.getContext('2d');
-const nameInput = document.getElementById('nameInput');
-const namesList = document.getElementById('namesList');
-const statusMsg = document.getElementById('statusMsg');
-const overlay   = document.getElementById('overlay');
-const modalName = document.getElementById('modalName');
+const DOM = {
+  canvas:       document.getElementById('wheel'),
+  nameInput:    document.getElementById('nameInput'),
+  namesList:    document.getElementById('namesList'),
+  statusMsg:    document.getElementById('statusMsg'),
+  bulkToggle:   document.getElementById('bulkToggle'),
+  bulkArea:     document.getElementById('bulkArea'),
+  bulkInput:    document.getElementById('bulkInput'),
+  spinHint:     document.getElementById('spinHint'),
+  overlay:      document.getElementById('overlay'),
+  modalName:    document.getElementById('modalName'),
+  pastSection:  document.getElementById('pastSection'),
+  pastList:     document.getElementById('pastList'),
+  header:       document.querySelector('header'),
+  btnAdd:       document.querySelector('.btn-add'),
+  btnBulkAdd:   document.querySelector('.btn-bulk-add'),
+  btnBulkClear: document.querySelector('.btn-bulk-clear'),
+  btnClearPast: document.querySelector('.btn-clear-past'),
+  btnClose:     document.querySelector('.btn-close'),
+  btnRemove:    document.querySelector('.btn-remove'),
+  tmplNameItem: document.getElementById('tmpl-name-item').content,
+  tmplPastItem: document.getElementById('tmpl-past-item').content,
+};
+
+const ctx = DOM.canvas.getContext('2d');
 
 /* ── INIT ── */
 (function init() {
@@ -66,30 +148,36 @@ const modalName = document.getElementById('modalName');
   // Restore saved data
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    names = Array.isArray(stored)
+    state.names = Array.isArray(stored)
       ? stored.filter(n => typeof n === 'string' && n.trim().length > 0)
       : [];
-  } catch { names = []; }
+  } catch (err) {
+    console.warn('Failed to load names from localStorage', err);
+    state.names = [];
+  }
 
   try {
     const storedRemoved = JSON.parse(localStorage.getItem(STORAGE_KEY_REMOVED) || '[]');
-    removed = Array.isArray(storedRemoved)
+    state.removed = Array.isArray(storedRemoved)
       ? storedRemoved.filter(n => typeof n === 'string' && n.trim().length > 0)
       : [];
-  } catch { removed = []; }
+  } catch (err) {
+    console.warn('Failed to load removed names from localStorage', err);
+    state.removed = [];
+  }
 
   // Event listeners — all wired here, no onclick in HTML
-  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
-  document.querySelector('.btn-add')       .addEventListener('click', addName);
-  document.getElementById('bulkToggle')    .addEventListener('click', toggleBulk);
-  document.querySelector('.btn-bulk-add')  .addEventListener('click', addBulk);
-  document.querySelector('.btn-bulk-clear').addEventListener('click', clearBulk);
-  document.querySelector('.btn-clear-past').addEventListener('click', clearPast);
-  overlay.addEventListener('click', overlayClick);
-  document.querySelector('.btn-close')     .addEventListener('click', closeModal);
-  document.querySelector('.btn-remove')    .addEventListener('click', removeWinner);
-  canvas.addEventListener('click', () => spin());
-  window.addEventListener('resize', debounce(resize, 150));
+  DOM.nameInput   .addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
+  DOM.btnAdd      .addEventListener('click', addName);
+  DOM.bulkToggle  .addEventListener('click', toggleBulk);
+  DOM.btnBulkAdd  .addEventListener('click', addBulk);
+  DOM.btnBulkClear.addEventListener('click', clearBulk);
+  DOM.btnClearPast.addEventListener('click', clearPast);
+  DOM.overlay     .addEventListener('click', overlayClick);
+  DOM.btnClose    .addEventListener('click', closeModal);
+  DOM.btnRemove   .addEventListener('click', removeWinner);
+  DOM.canvas      .addEventListener('click', () => spin());
+  window          .addEventListener('resize', debounce(resize, RESIZE_DEBOUNCE));
 
   resize();
   renderList();
@@ -97,21 +185,29 @@ const modalName = document.getElementById('modalName');
   startIdleRotation();
 })();
 
-/* ── DATA ── */
+/* ── PERSISTENCE ── */
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(names));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.names));
 }
 
 function saveRemoved() {
-  localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify(removed));
+  localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify(state.removed));
 }
 
+/* ── DATA ── */
 function addName() {
-  const v = nameInput.value.trim();
-  if (!v) { nameInput.focus(); return; }
-  names.push(v);
-  nameInput.value = '';
-  nameInput.focus();
+  const value = DOM.nameInput.value.trim();
+  if (!value) { DOM.nameInput.focus(); return; }
+  state.names.push(value);
+  DOM.nameInput.value = '';
+  DOM.nameInput.focus();
+  save();
+  renderList();
+  drawWheel();
+}
+
+function removeName(i) {
+  state.names.splice(i, 1);
   save();
   renderList();
   drawWheel();
@@ -119,53 +215,41 @@ function addName() {
 
 /* ── BULK ADD ── */
 function toggleBulk() {
-  const area   = document.getElementById('bulkArea');
-  const toggle = document.getElementById('bulkToggle');
-  const open   = area.classList.toggle('open');
-  toggle.textContent = open ? '▲ Paste total list' : '▼ Paste total list';
-  if (open) document.getElementById('bulkInput').focus();
+  const isOpen = DOM.bulkArea.classList.toggle('open');
+  DOM.bulkToggle.textContent = isOpen ? '▲ Paste total list' : '▼ Paste total list';
+  if (isOpen) DOM.bulkInput.focus();
 }
 
 function addBulk() {
-  const raw   = document.getElementById('bulkInput').value;
-  const added = raw
+  const added = DOM.bulkInput.value
     .split('\n')
     .map(s => s.trim())
     .filter(s => s.length > 0 && s.length <= 25);
 
   if (added.length === 0) return;
 
-  names.push(...added);
+  state.names.push(...added);
   save();
   renderList();
   drawWheel();
 
-  // Close bulk area and reset textarea
-  document.getElementById('bulkInput').value = '';
-  document.getElementById('bulkArea').classList.remove('open');
-  document.getElementById('bulkToggle').textContent = '▼ Paste total list';
+  DOM.bulkInput.value = '';
+  DOM.bulkArea.classList.remove('open');
+  DOM.bulkToggle.textContent = '▼ Paste total list';
 }
 
 function clearBulk() {
-  document.getElementById('bulkInput').value = '';
-  document.getElementById('bulkInput').focus();
-}
-
-function removeName(i) {
-  names.splice(i, 1);
-  save();
-  renderList();
-  drawWheel();
+  DOM.bulkInput.value = '';
+  DOM.bulkInput.focus();
 }
 
 /* ── LIST UI ── */
 function renderList() {
-  namesList.innerHTML = '';
-  const tmpl = document.getElementById('tmpl-name-item').content;
+  DOM.namesList.innerHTML = '';
 
-  names.forEach((name, i) => {
+  state.names.forEach((name, i) => {
     const color  = COLORS[i % COLORS.length];
-    const frag   = tmpl.cloneNode(true);
+    const frag   = DOM.tmplNameItem.cloneNode(true);
     const li     = frag.querySelector('li');
     const dot    = frag.querySelector('.color-dot');
     const label  = frag.querySelector('.name-label');
@@ -173,174 +257,141 @@ function renderList() {
 
     li.style.borderLeftColor = color;
     dot.style.background     = color;
-    label.textContent        = name;   // textContent auto-escapes — no manual escaping needed
+    label.textContent        = name;  // textContent auto-escapes — no manual escaping needed
     label.title              = name;
     btnDel.addEventListener('click', () => removeName(i));
 
-    namesList.appendChild(frag);
+    DOM.namesList.appendChild(frag);
   });
 
-  const n = names.length;
-  if (n === 0) {
-    statusMsg.textContent = 'Add at least 2 names.';
-    statusMsg.className   = 'status-msg warn';
-  } else if (n === 1) {
-    statusMsg.textContent = '1 participant — add at least 1 more.';
-    statusMsg.className   = 'status-msg warn';
+  const count = state.names.length;
+  if (count === 0) {
+    DOM.statusMsg.textContent = 'Add at least 2 names.';
+    DOM.statusMsg.className   = 'status-msg warn';
+  } else if (count === 1) {
+    DOM.statusMsg.textContent = '1 participant — add at least 1 more.';
+    DOM.statusMsg.className   = 'status-msg warn';
   } else {
-    statusMsg.textContent = `${n} participants`;
-    statusMsg.className   = 'status-msg';
+    DOM.statusMsg.textContent = `${count} participants`;
+    DOM.statusMsg.className   = 'status-msg';
   }
 
   updateCursor();
 }
 
-/* ── CANVAS DRAW ── */
+/* ── CANVAS LAYOUT ── */
 function resize() {
-  const isMobile = window.innerWidth <= 680;
-  const headerH  = (document.querySelector('header')?.offsetHeight ?? 80);
-  const vPad     = 60;              // top + bottom breathing room
-  const hPad     = isMobile ? 40 : 60; // left + right breathing room
-  const panelW   = isMobile ? 0 : 340; // panel width (300) + its right margin (20) + gap (20)
+  const isMobile = window.innerWidth <= CANVAS_BREAKPOINT;
+  const headerH  = DOM.header?.offsetHeight ?? 80;
+  const vPad     = 60;
+  const hPad     = isMobile ? 40 : 60;
+  const panelW   = isMobile ? 0 : CANVAS_PANEL_WIDTH;
 
   const maxH = window.innerHeight - headerH - vPad;
   const maxW = window.innerWidth  - panelW  - hPad;
-  const size = Math.max(240, Math.min(maxH, maxW, 900));
+  const size = Math.max(CANVAS_MIN_SIZE, Math.min(maxH, maxW, CANVAS_MAX_SIZE));
 
-  canvas.width  = size;
-  canvas.height = size;
+  DOM.canvas.width  = size;
+  DOM.canvas.height = size;
   drawWheel();
 }
 
+/* ── CANVAS DRAW ── */
 function drawWheel() {
-  const W = canvas.width, H = canvas.height;
-  const cx = W / 2, cy = H / 2;
-  const r  = Math.min(cx, cy) - 30; // leaves room for the right-side pointer
+  const W  = DOM.canvas.width;
+  const H  = DOM.canvas.height;
+  const cx = W / 2;
+  const cy = H / 2;
+  const r  = Math.min(cx, cy) - CANVAS_MARGIN;
 
   ctx.clearRect(0, 0, W, H);
 
-  if (names.length === 0) { drawEmpty(cx, cy, r); return; }
-  if (names.length === 1) { drawSingleSegment(cx, cy, r); return; }
+  if (state.names.length === 0) { drawEmpty(cx, cy, r); return; }
+  if (state.names.length === 1) { drawSingleSegment(cx, cy, r); return; }
 
-  const seg = (2 * Math.PI) / names.length;
+  const segmentAngle = (2 * Math.PI) / state.names.length;
 
-  for (let i = 0; i < names.length; i++) {
-    const a0    = angle + i * seg;
-    const a1    = a0 + seg;
-    const color = COLORS[i % COLORS.length];
+  drawSegments(cx, cy, r, segmentAngle);
+  drawOuterRing(cx, cy, r);
+  drawHub(cx, cy);
+  drawPointer(cx, cy, r);
+}
 
-    // Segment fill
+function drawSegments(cx, cy, r, segmentAngle) {
+  for (let i = 0; i < state.names.length; i++) {
+    const startAngle = state.angle + i * segmentAngle;
+    const endAngle   = startAngle + segmentAngle;
+    const color      = COLORS[i % COLORS.length];
+
     ctx.beginPath();
     ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, a0, a1);
+    ctx.arc(cx, cy, r, startAngle, endAngle);
     ctx.closePath();
     ctx.fillStyle   = color;
     ctx.fill();
     ctx.strokeStyle = THEME.segStroke;
-    ctx.lineWidth   = 1.5;
+    ctx.lineWidth   = THEME.segLineWidth;
     ctx.stroke();
 
-    // Radial text
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(a0 + seg / 2);
-    ctx.textAlign    = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor  = THEME.textShadow;
-    ctx.shadowBlur   = 4;
-
-    const fs = Math.max(10, Math.round(Math.min(r * seg / 7, r * 0.07) * THEME.nameSize));
-    ctx.font      = `bold ${fs}px ${THEME.font}`;
-    ctx.fillStyle = THEME.textColor;
-
-    let txt = names[i];
-    const maxW = r * 0.72;
-    while (ctx.measureText(txt).width > maxW && txt.length > 2) {
-      txt = txt.slice(0, -1);
-    }
-    if (txt.length < names[i].length) txt += '…';
-
-    ctx.fillText(txt, r - 12, 0);
-    ctx.restore();
+    drawSegmentLabel(cx, cy, r, startAngle, segmentAngle, i);
   }
-
-  // Outer ring
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.strokeStyle = THEME.ringStroke;
-  ctx.lineWidth   = 4;
-  ctx.stroke();
-
-  drawHub(cx, cy);
-  drawPointer(cx, cy, r);
-  drawHint(cx, cy);
 }
 
-function drawHint(cx, cy) {
-  if (hasSpun || spinning || names.length < 2) return;
-
-  const text  = 'Click to spin';
-  const fSize = 20;
+function drawSegmentLabel(cx, cy, r, startAngle, segmentAngle, i) {
   ctx.save();
-  ctx.font = `bold ${fSize}px ${THEME.font}`;
+  ctx.translate(cx, cy);
+  ctx.rotate(startAngle + segmentAngle / 2);
+  ctx.textAlign    = THEME.textAlign;
+  ctx.textBaseline = THEME.textBaseline;
+  ctx.shadowColor  = THEME.textShadow;
+  ctx.shadowBlur   = THEME.textShadowBlur;
 
-  const tw   = ctx.measureText(text).width;
-  const padX = 16, padY = 9;
-  const bw   = tw + padX * 2;
-  const bh   = fSize + padY * 2;
-  const bx   = cx - bw / 2;
-  const by   = cy - bh / 2;
-  const br   = 10; // border radius
+  const fontSize = Math.max(10, Math.round(Math.min(r * segmentAngle / 7, r * 0.07) * THEME.nameSize));
+  ctx.font      = `${THEME.textWeight} ${fontSize}px ${THEME.font}`;
+  ctx.fillStyle = THEME.textColor;
 
-  // Rounded rectangle background
-  ctx.fillStyle = THEME.hintBg;
-  ctx.beginPath();
-  ctx.moveTo(bx + br, by);
-  ctx.lineTo(bx + bw - br, by);
-  ctx.quadraticCurveTo(bx + bw, by,      bx + bw, by + br);
-  ctx.lineTo(bx + bw, by + bh - br);
-  ctx.quadraticCurveTo(bx + bw, by + bh, bx + bw - br, by + bh);
-  ctx.lineTo(bx + br, by + bh);
-  ctx.quadraticCurveTo(bx, by + bh,      bx, by + bh - br);
-  ctx.lineTo(bx, by + br);
-  ctx.quadraticCurveTo(bx, by,           bx + br, by);
-  ctx.closePath();
-  ctx.fill();
+  let label    = state.names[i];
+  const maxWidth = r * THEME.textMaxWidth;
+  while (ctx.measureText(label).width > maxWidth && label.length > 2) {
+    label = label.slice(0, -1);
+  }
+  if (label.length < state.names[i].length) label += '…';
 
-  // Text
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle    = THEME.hintText;
-  ctx.fillText(text, cx, cy);
-
+  ctx.fillText(label, r - THEME.textOffset, 0);
   ctx.restore();
 }
 
-function drawPointer(cx, cy, r) {
-  // Pointer on the right side (angle = 0), pointing left toward the wheel
+function drawOuterRing(cx, cy, r) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+  ctx.strokeStyle = THEME.ringStroke;
+  ctx.lineWidth   = THEME.ringLineWidth;
+  ctx.stroke();
+}
 
-  // Determine the colour of the segment currently at the pointer
+function drawPointer(cx, cy, r) {
+  // Pointer sits on the right side (angle = 0), tip overlaps into the wheel
+
+  // Match pointer colour to the segment currently under it
   let color = THEME.gold;
-  if (names.length >= 1) {
-    const seg  = (2 * Math.PI) / names.length;
-    const norm = ((-angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    const idx  = Math.floor(norm / seg) % names.length;
-    color = COLORS[idx % COLORS.length];
+  if (state.names.length >= 1) {
+    const segmentAngle    = (2 * Math.PI) / state.names.length;
+    const normalizedAngle = ((-state.angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    const segmentIndex    = Math.floor(normalizedAngle / segmentAngle) % state.names.length;
+    color = COLORS[segmentIndex % COLORS.length];
   }
 
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Shadow for depth
   ctx.shadowColor   = THEME.ptrShadow;
-  ctx.shadowBlur    = 6;
-  ctx.shadowOffsetX = 1;
+  ctx.shadowBlur    = THEME.ptrShadowBlur;
+  ctx.shadowOffsetX = THEME.ptrShadowX;
 
-  // Left-pointing triangle: tip overlaps into the wheel, base sticks out to the right
   ctx.beginPath();
-  ctx.moveTo(r - 18,  0);   // tip — 18px inside the rim
-  ctx.lineTo(r + 18, -13);  // top-right
-  ctx.lineTo(r + 18,  13);  // bottom-right
+  ctx.moveTo(r - THEME.ptrOverlap,  0);               // tip — inside the wheel
+  ctx.lineTo(r + THEME.ptrReach,   -THEME.ptrHeight);  // top-right
+  ctx.lineTo(r + THEME.ptrReach,    THEME.ptrHeight);  // bottom-right
   ctx.closePath();
 
   ctx.fillStyle = color;
@@ -349,7 +400,7 @@ function drawPointer(cx, cy, r) {
   ctx.shadowBlur    = 0;
   ctx.shadowOffsetX = 0;
   ctx.strokeStyle   = THEME.ptrStroke;
-  ctx.lineWidth     = 2;
+  ctx.lineWidth     = THEME.ptrLineWidth;
   ctx.stroke();
 
   ctx.restore();
@@ -361,13 +412,13 @@ function drawEmpty(cx, cy, r) {
   ctx.fillStyle   = THEME.emptyFill;
   ctx.fill();
   ctx.strokeStyle = THEME.emptyStroke;
-  ctx.lineWidth   = 3;
+  ctx.lineWidth   = THEME.emptyLineWidth;
   ctx.stroke();
 
   ctx.fillStyle    = THEME.emptyText;
-  ctx.font         = `15px ${THEME.font}`;
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.font         = `${THEME.emptySize}px ${THEME.font}`;
+  ctx.textAlign    = THEME.textAlignCenter;
+  ctx.textBaseline = THEME.textBaseline;
   ctx.fillText('Add names to get started', cx, cy);
 
   drawPointer(cx, cy, r);
@@ -379,17 +430,17 @@ function drawSingleSegment(cx, cy, r) {
   ctx.fillStyle   = COLORS[0];
   ctx.fill();
   ctx.strokeStyle = THEME.ringStroke;
-  ctx.lineWidth   = 4;
+  ctx.lineWidth   = THEME.ringLineWidth;
   ctx.stroke();
 
   ctx.save();
   ctx.shadowColor  = THEME.textShadow;
-  ctx.shadowBlur   = 4;
+  ctx.shadowBlur   = THEME.textShadowBlur;
   ctx.fillStyle    = THEME.textColor;
-  ctx.font         = `bold 18px ${THEME.font}`;
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(names[0], cx, cy);
+  ctx.font         = `${THEME.textWeight} ${THEME.singleSize}px ${THEME.font}`;
+  ctx.textAlign    = THEME.textAlignCenter;
+  ctx.textBaseline = THEME.textBaseline;
+  ctx.fillText(state.names[0], cx, cy);
   ctx.restore();
 
   drawHub(cx, cy);
@@ -398,43 +449,43 @@ function drawSingleSegment(cx, cy, r) {
 
 function drawHub(cx, cy) {
   const layers = [
-    [24, THEME.hubOuter],
-    [17, THEME.hubMid],
-    [8,  THEME.hubInner],
+    [THEME.hubR1, THEME.hubOuter],
+    [THEME.hubR2, THEME.hubMid],
+    [THEME.hubR3, THEME.hubInner],
   ];
-  layers.forEach(([rad, fill]) => {
+  layers.forEach(([radius, fill]) => {
     ctx.beginPath();
-    ctx.arc(cx, cy, rad, 0, 2 * Math.PI);
+    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
     ctx.fillStyle = fill;
     ctx.fill();
   });
 }
 
-/* ── CURSOR ── */
+/* ── CURSOR + HINT ── */
 function updateCursor() {
-  canvas.classList.remove('spinning', 'not-allowed');
-  if (spinning)              canvas.classList.add('spinning');
-  else if (names.length < 2) canvas.classList.add('not-allowed');
+  DOM.canvas.classList.remove('spinning', 'not-allowed');
+  if (state.spinning)              DOM.canvas.classList.add('spinning');
+  else if (state.names.length < 2) DOM.canvas.classList.add('not-allowed');
+
+  DOM.spinHint.classList.toggle('hidden', state.hasSpun || state.spinning || state.names.length < 2);
 }
 
 /* ── IDLE ROTATION ── */
-const IDLE_SPEED = 0.00018; // radians per ms ≈ one full rotation every ~35 seconds
-
 function startIdleRotation() {
-  if (idleRaf) return; // already running
+  if (state.idleRaf) return; // already running
   let lastTime = null;
 
   function idleFrame(t) {
-    if (spinning) { idleRaf = null; return; } // hand off to spin animation
+    if (state.spinning) { state.idleRaf = null; return; } // spin animation takes over
     if (lastTime !== null) {
-      angle = (angle + IDLE_SPEED * (t - lastTime)) % (2 * Math.PI);
+      state.angle = (state.angle + IDLE_SPEED * (t - lastTime)) % (2 * Math.PI);
       drawWheel();
     }
-    lastTime = t;
-    idleRaf  = requestAnimationFrame(idleFrame);
+    lastTime      = t;
+    state.idleRaf = requestAnimationFrame(idleFrame);
   }
 
-  idleRaf = requestAnimationFrame(idleFrame);
+  state.idleRaf = requestAnimationFrame(idleFrame);
 }
 
 /* ── AUDIO ── */
@@ -450,16 +501,14 @@ function getAudioCtx() {
 
 function playTick(volume) {
   try {
-    const ac       = getAudioCtx();
-    const now      = ac.currentTime;
-    const duration = 0.045;
-
-    // Short noise burst shaped into a click
-    const samples = Math.floor(ac.sampleRate * duration);
+    const ac      = getAudioCtx();
+    const now     = ac.currentTime;
+    const samples = Math.floor(ac.sampleRate * TICK_DURATION);
     const buffer  = ac.createBuffer(1, samples, ac.sampleRate);
     const data    = buffer.getChannelData(0);
+
+    // White noise that decays sharply → click sound
     for (let i = 0; i < samples; i++) {
-      // White noise that decays sharply → click sound
       data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / samples, 6);
     }
 
@@ -469,11 +518,11 @@ function playTick(volume) {
     // High-pass filter: remove low rumble, keep crisp click
     const filter           = ac.createBiquadFilter();
     filter.type            = 'highpass';
-    filter.frequency.value = 1200;
+    filter.frequency.value = TICK_FILTER_FREQ;
 
     const gain = ac.createGain();
-    gain.gain.setValueAtTime(volume * 0.5, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+    gain.gain.setValueAtTime(volume * TICK_GAIN_FACTOR, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + TICK_DURATION);
 
     source.connect(filter);
     filter.connect(gain);
@@ -484,61 +533,60 @@ function playTick(volume) {
 
 /* ── SPIN ── */
 function spin() {
-  if (spinning || names.length < 2) return;
+  if (state.spinning || state.names.length < 2) return;
 
-  spinning = true;
-  hasSpun  = true;
-  if (idleRaf) { cancelAnimationFrame(idleRaf); idleRaf = null; }
+  state.spinning = true;
+  state.hasSpun  = true;
+  if (state.idleRaf) { cancelAnimationFrame(state.idleRaf); state.idleRaf = null; }
   updateCursor();
 
-  const n         = names.length;
-  const seg       = (2 * Math.PI) / n;
-  const winnerIdx = Math.floor(Math.random() * n);
+  const nameCount    = state.names.length;
+  const segmentAngle = (2 * Math.PI) / nameCount;
+  const winnerIdx    = Math.floor(Math.random() * nameCount);
 
   // Center of winner's segment should land at angle 0 (right = pointer)
-  const winnerCenter = winnerIdx * seg + seg / 2;
+  const winnerCenter = winnerIdx * segmentAngle + segmentAngle / 2;
   let targetAngle    = -winnerCenter;
 
   // Forward delta from current angle
-  let delta = (targetAngle - angle) % (2 * Math.PI);
+  let delta = (targetAngle - state.angle) % (2 * Math.PI);
   if (delta < 0) delta += 2 * Math.PI;
 
-  // Add full rotations (3–5 spins)
-  delta += (3 + Math.floor(Math.random() * 3)) * 2 * Math.PI;
+  // Add full rotations
+  delta += (SPIN_MIN_ROTATIONS + Math.floor(Math.random() * SPIN_ROTATION_RANGE)) * 2 * Math.PI;
 
-  const startAngle = angle;
-  const duration   = 4000 + Math.random() * 1500; // 4–5.5 seconds
-  const t0         = performance.now();
-  let   prevBoundary = Math.floor(startAngle / seg);
+  const startAngle   = state.angle;
+  const duration     = SPIN_MIN_DURATION + Math.random() * SPIN_EXTRA_DURATION;
+  const startTime    = performance.now();
+  let   prevBoundary = Math.floor(startAngle / segmentAngle);
 
   function frame(t) {
-    const p     = Math.min((t - t0) / duration, 1);
-    const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+    const progress = Math.min((t - startTime) / duration, 1);
+    const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
 
-    angle = startAngle + delta * eased;
+    state.angle = startAngle + delta * eased;
     drawWheel();
 
     // Play a tick for every segment boundary crossed this frame
-    const currBoundary = Math.floor(angle / seg);
-    const crossings    = Math.min(currBoundary - prevBoundary, 4); // cap to avoid audio burst
+    const currBoundary = Math.floor(state.angle / segmentAngle);
+    const crossings    = Math.min(currBoundary - prevBoundary, TICK_MAX_CROSSINGS);
     if (crossings > 0) {
-      const volume = Math.max(0.1, 1 - p * 0.88); // quieter as wheel slows
+      const volume = Math.max(TICK_VOLUME_MIN, 1 - progress * TICK_VOLUME_FADE);
       for (let c = 0; c < crossings; c++) {
-        // Stagger multiple ticks slightly so they don't overlap
-        setTimeout(() => playTick(volume), c * 12);
+        setTimeout(() => playTick(volume), c * TICK_STAGGER_MS);
       }
     }
     prevBoundary = currBoundary;
 
-    if (p < 1) {
+    if (progress < 1) {
       requestAnimationFrame(frame);
     } else {
       // Normalise angle to [0, 2π) to prevent float accumulation
-      angle      = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-      spinning   = false;
-      lastWinner = winnerIdx;
+      state.angle      = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      state.spinning   = false;
+      state.lastWinner = winnerIdx;
       updateCursor();
-      setTimeout(() => showWinner(names[winnerIdx]), 300);
+      setTimeout(() => showWinner(state.names[winnerIdx]), SPIN_WINNER_DELAY);
       // idle rotation resumes only after the modal is dismissed (see closeModal)
     }
   }
@@ -548,20 +596,20 @@ function spin() {
 
 /* ── MODAL ── */
 function showWinner(name) {
-  modalName.textContent = name;
-  overlay.classList.add('open');
+  DOM.modalName.textContent = name;
+  DOM.overlay.classList.add('open');
 }
 
 function closeModal() {
-  overlay.classList.remove('open');
+  DOM.overlay.classList.remove('open');
   startIdleRotation(); // wheel resumes slow rotation once popup is dismissed
 }
 
 function removeWinner() {
-  if (lastWinner < 0 || lastWinner >= names.length) { closeModal(); return; }
-  const [name] = names.splice(lastWinner, 1);
-  lastWinner = -1;
-  removed.push(name);
+  if (state.lastWinner < 0 || state.lastWinner >= state.names.length) { closeModal(); return; }
+  const [name] = state.names.splice(state.lastWinner, 1);
+  state.lastWinner = -1;
+  state.removed.push(name);
   save();
   saveRemoved();
   renderList();
@@ -572,35 +620,31 @@ function removeWinner() {
 
 /* ── PAST PARTICIPANTS ── */
 function renderRemoved() {
-  const section  = document.getElementById('pastSection');
-  const pastList = document.getElementById('pastList');
-  const tmpl     = document.getElementById('tmpl-past-item').content;
-
-  if (removed.length === 0) {
-    section.classList.remove('visible');
+  if (state.removed.length === 0) {
+    DOM.pastSection.classList.remove('visible');
     return;
   }
 
-  section.classList.add('visible');
-  pastList.innerHTML = '';
+  DOM.pastSection.classList.add('visible');
+  DOM.pastList.innerHTML = '';
 
-  removed.forEach(name => {
-    const frag = tmpl.cloneNode(true);
+  state.removed.forEach(name => {
+    const frag = DOM.tmplPastItem.cloneNode(true);
     const span = frag.querySelector('.past-name');
     span.textContent = name;  // textContent auto-escapes — no manual escaping needed
     span.title       = name;
-    pastList.appendChild(frag);
+    DOM.pastList.appendChild(frag);
   });
 }
 
 function clearPast() {
-  removed = [];
+  state.removed = [];
   saveRemoved();
   renderRemoved();
 }
 
 function overlayClick(e) {
-  if (e.target === overlay) closeModal();
+  if (e.target === DOM.overlay) closeModal();
 }
 
 /* ── UTILS ── */
