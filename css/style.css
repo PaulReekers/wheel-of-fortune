@@ -46,8 +46,6 @@
   --wof-empty-fill:          rgba(255,255,255,0.03);
   --wof-empty-stroke:        rgba(255,255,255,0.12);
   --wof-empty-line-width:    3;
-  --wof-empty-text:          rgba(255,255,255,0.22);
-  --wof-empty-size:          15;      /* font size (px) */
 
   /* Segment colour palette — 15 colours (edit here to reskin the wheel) */
   --wof-c-0:  #e74c3c;
@@ -138,6 +136,23 @@ header p {
 }
 
 .spin-hint.hidden {
+  opacity: 0;
+}
+
+/* "Add names to get started" — centered over the empty canvas, toggled via JS */
+.empty-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255,255,255,0.22);
+  font-size: 15px;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 0.25s;
+}
+
+.empty-hint.hidden {
   opacity: 0;
 }
 
@@ -255,7 +270,7 @@ canvas#wheel.spinning    { cursor: default; }
   margin-bottom: 6px;
   border-radius: 9px;
   background: rgba(255,255,255,0.06);
-  border-left: 4px solid transparent;
+  border-left: 4px solid var(--item-color, transparent);
   animation: fadeSlide .22s ease;
 }
 
@@ -271,6 +286,7 @@ canvas#wheel.spinning    { cursor: default; }
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  background: var(--item-color);
 }
 
 .name-label {
@@ -322,6 +338,9 @@ canvas#wheel.spinning    { cursor: default; }
 }
 
 .bulk-toggle:hover { color: #FFD700; border-color: rgba(255,215,0,0.4); }
+
+.bulk-toggle::before      { content: '▼ '; }
+.bulk-toggle.open::before { content: '▲ '; }
 
 .bulk-area {
   display: none;

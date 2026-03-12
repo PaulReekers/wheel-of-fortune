@@ -59,12 +59,10 @@ function loadTheme() {
     ptrReach:        n('--wof-pointer-reach'),
     ptrHeight:       n('--wof-pointer-height'),
 
-    // Empty state
+    // Empty state (circle + pointer; text is an HTML overlay — see #emptyHint)
     emptyFill:       v('--wof-empty-fill'),
     emptyStroke:     v('--wof-empty-stroke'),
     emptyLineWidth:  n('--wof-empty-line-width'),
-    emptyText:       v('--wof-empty-text'),
-    emptySize:       n('--wof-empty-size'),
   };
 }
 
@@ -103,6 +101,10 @@ const IDLE_SPEED          = 0.00018; // rad/ms ≈ one full rotation every ~35 s
 // UI
 const RESIZE_DEBOUNCE     = 150;   // ms — debounce delay for the window resize handler
 
+/* ── UI STRINGS ── */
+const MSG_MIN_NAMES = 'Add at least 2 names.';
+const MSG_ONE_NAME  = '1 participant — add at least 1 more.';
+
 /* ── STATE ── */
 const state = {
   names:      [],    // participant names currently on the wheel
@@ -124,6 +126,7 @@ const DOM = {
   bulkArea:     document.getElementById('bulkArea'),
   bulkInput:    document.getElementById('bulkInput'),
   spinHint:     document.getElementById('spinHint'),
+  emptyHint:    document.getElementById('emptyHint'),
   overlay:      document.getElementById('overlay'),
   modalName:    document.getElementById('modalName'),
   pastSection:  document.getElementById('pastSection'),
@@ -216,7 +219,7 @@ function removeName(i) {
 /* ── BULK ADD ── */
 function toggleBulk() {
   const isOpen = DOM.bulkArea.classList.toggle('open');
-  DOM.bulkToggle.textContent = isOpen ? '▲ Paste total list' : '▼ Paste total list';
+  DOM.bulkToggle.classList.toggle('open', isOpen);
   if (isOpen) DOM.bulkInput.focus();
 }
 
@@ -235,7 +238,7 @@ function addBulk() {
 
   DOM.bulkInput.value = '';
   DOM.bulkArea.classList.remove('open');
-  DOM.bulkToggle.textContent = '▼ Paste total list';
+  DOM.bulkToggle.classList.remove('open');
 }
 
 function clearBulk() {
@@ -255,8 +258,7 @@ function renderList() {
     const label  = frag.querySelector('.name-label');
     const btnDel = frag.querySelector('.btn-del');
 
-    li.style.borderLeftColor = color;
-    dot.style.background     = color;
+    li.style.setProperty('--item-color', color);
     label.textContent        = name;  // textContent auto-escapes — no manual escaping needed
     label.title              = name;
     btnDel.addEventListener('click', () => removeName(i));
@@ -265,16 +267,10 @@ function renderList() {
   });
 
   const count = state.names.length;
-  if (count === 0) {
-    DOM.statusMsg.textContent = 'Add at least 2 names.';
-    DOM.statusMsg.className   = 'status-msg warn';
-  } else if (count === 1) {
-    DOM.statusMsg.textContent = '1 participant — add at least 1 more.';
-    DOM.statusMsg.className   = 'status-msg warn';
-  } else {
-    DOM.statusMsg.textContent = `${count} participants`;
-    DOM.statusMsg.className   = 'status-msg';
-  }
+  DOM.statusMsg.textContent = count === 0 ? MSG_MIN_NAMES
+                            : count === 1 ? MSG_ONE_NAME
+                            : `${count} participants`;
+  DOM.statusMsg.classList.toggle('warn', count < 2);
 
   updateCursor();
 }
@@ -415,12 +411,7 @@ function drawEmpty(cx, cy, r) {
   ctx.lineWidth   = THEME.emptyLineWidth;
   ctx.stroke();
 
-  ctx.fillStyle    = THEME.emptyText;
-  ctx.font         = `${THEME.emptySize}px ${THEME.font}`;
-  ctx.textAlign    = THEME.textAlignCenter;
-  ctx.textBaseline = THEME.textBaseline;
-  ctx.fillText('Add names to get started', cx, cy);
-
+  // "Add names to get started" is an HTML overlay — see #emptyHint in index.html
   drawPointer(cx, cy, r);
 }
 
@@ -467,7 +458,8 @@ function updateCursor() {
   if (state.spinning)              DOM.canvas.classList.add('spinning');
   else if (state.names.length < 2) DOM.canvas.classList.add('not-allowed');
 
-  DOM.spinHint.classList.toggle('hidden', state.hasSpun || state.spinning || state.names.length < 2);
+  DOM.spinHint.classList.toggle('hidden',  state.hasSpun || state.spinning || state.names.length < 2);
+  DOM.emptyHint.classList.toggle('hidden', state.names.length !== 0);
 }
 
 /* ── IDLE ROTATION ── */
