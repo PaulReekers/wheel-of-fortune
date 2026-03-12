@@ -1,11 +1,42 @@
 'use strict';
 
-/* ── CONSTANTS ── */
-const COLORS = [
-  '#e74c3c','#3498db','#2ecc71','#f39c12','#9b59b6',
-  '#1abc9c','#e67e22','#e91e63','#00bcd4','#8bc34a',
-  '#ff5722','#607d8b','#673ab7','#4caf50','#ff9800'
-];
+/* ── THEME ────────────────────────────────────────────────────────────────────
+   All colours and the font are defined as CSS custom properties in style.css.
+   loadTheme() reads them once at startup so the canvas can use them.
+   To change the look of the wheel, edit the :root block in style.css only.
+────────────────────────────────────────────────────────────────────────────── */
+let COLORS = [];   // segment palette, populated by loadTheme()
+let THEME  = {};   // canvas style values, populated by loadTheme()
+
+function loadTheme() {
+  const v = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  // Segment colour palette (--wof-c-0 … --wof-c-14)
+  COLORS = Array.from({ length: 15 }, (_, i) => v(`--wof-c-${i}`));
+
+  // All other canvas colours + font
+  THEME = {
+    gold:        v('--wof-gold'),
+    dark:        v('--wof-dark'),
+    font:        v('--wof-font') || 'Segoe UI, sans-serif',
+    segStroke:   v('--wof-seg-stroke'),
+    ringStroke:  v('--wof-ring-stroke'),
+    textColor:   v('--wof-text-color'),
+    textShadow:  v('--wof-text-shadow'),
+    hubOuter:    v('--wof-hub-outer'),
+    hubMid:      v('--wof-hub-mid'),
+    hubInner:    v('--wof-hub-inner'),
+    ptrStroke:   v('--wof-pointer-stroke'),
+    ptrShadow:   v('--wof-pointer-shadow'),
+    hintBg:      v('--wof-hint-bg'),
+    hintText:    v('--wof-hint-text'),
+    emptyFill:   v('--wof-empty-fill'),
+    emptyStroke: v('--wof-empty-stroke'),
+    emptyText:   v('--wof-empty-text'),
+  };
+}
+
+/* ── STORAGE KEYS ── */
 const STORAGE_KEY         = 'wof_names_v1';
 const STORAGE_KEY_REMOVED = 'wof_removed_v1';
 
@@ -16,7 +47,7 @@ let angle      = 0;      // current wheel rotation in radians
 let spinning   = false;
 let lastWinner = -1;     // index of last winner (for removal)
 let idleRaf    = null;   // requestAnimationFrame handle for idle rotation
-let hasSpun    = false;  // tracks whether wheel has been spun (hides hint after first spin)
+let hasSpun    = false;  // hides the "Click to spin" hint after first spin
 
 /* ── DOM ── */
 const canvas    = document.getElementById('wheel');
@@ -29,6 +60,9 @@ const modalName = document.getElementById('modalName');
 
 /* ── INIT ── */
 (function init() {
+  loadTheme();
+
+  // Restore saved data
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     names = Array.isArray(stored)
@@ -43,7 +77,16 @@ const modalName = document.getElementById('modalName');
       : [];
   } catch { removed = []; }
 
+  // Event listeners — all wired here, no onclick in HTML
   nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
+  document.querySelector('.btn-add')       .addEventListener('click', addName);
+  document.getElementById('bulkToggle')    .addEventListener('click', toggleBulk);
+  document.querySelector('.btn-bulk-add')  .addEventListener('click', addBulk);
+  document.querySelector('.btn-bulk-clear').addEventListener('click', clearBulk);
+  document.querySelector('.btn-clear-past').addEventListener('click', clearPast);
+  overlay.addEventListener('click', overlayClick);
+  document.querySelector('.btn-close')     .addEventListener('click', closeModal);
+  document.querySelector('.btn-remove')    .addEventListener('click', removeWinner);
   canvas.addEventListener('click', () => spin());
   window.addEventListener('resize', debounce(resize, 150));
 
@@ -117,42 +160,38 @@ function removeName(i) {
 /* ── LIST UI ── */
 function renderList() {
   namesList.innerHTML = '';
+  const tmpl = document.getElementById('tmpl-name-item').content;
 
   names.forEach((name, i) => {
-    const color = COLORS[i % COLORS.length];
-    const li = document.createElement('li');
+    const color  = COLORS[i % COLORS.length];
+    const frag   = tmpl.cloneNode(true);
+    const li     = frag.querySelector('li');
+    const dot    = frag.querySelector('.color-dot');
+    const label  = frag.querySelector('.name-label');
+    const btnDel = frag.querySelector('.btn-del');
+
     li.style.borderLeftColor = color;
-    li.innerHTML = `
-      <div class="name-inner">
-        <span class="color-dot" style="background:${color}"></span>
-        <span class="name-label" title="${esc(name)}">${esc(name)}</span>
-      </div>
-      <button class="btn-del" onclick="removeName(${i})" aria-label="Remove">✕</button>
-    `;
-    namesList.appendChild(li);
+    dot.style.background     = color;
+    label.textContent        = name;   // textContent auto-escapes — no manual escaping needed
+    label.title              = name;
+    btnDel.addEventListener('click', () => removeName(i));
+
+    namesList.appendChild(frag);
   });
 
   const n = names.length;
   if (n === 0) {
     statusMsg.textContent = 'Add at least 2 names.';
-    statusMsg.className = 'status-msg warn';
+    statusMsg.className   = 'status-msg warn';
   } else if (n === 1) {
     statusMsg.textContent = '1 participant — add at least 1 more.';
-    statusMsg.className = 'status-msg warn';
+    statusMsg.className   = 'status-msg warn';
   } else {
     statusMsg.textContent = `${n} participants`;
-    statusMsg.className = 'status-msg';
+    statusMsg.className   = 'status-msg';
   }
 
   updateCursor();
-}
-
-function esc(s) {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 /* ── CANVAS DRAW ── */
@@ -175,7 +214,7 @@ function resize() {
 function drawWheel() {
   const W = canvas.width, H = canvas.height;
   const cx = W / 2, cy = H / 2;
-  const r  = Math.min(cx, cy) - 30; // smaller radius leaves room for right-side pointer
+  const r  = Math.min(cx, cy); // leaves room for the right-side pointer
 
   ctx.clearRect(0, 0, W, H);
 
@@ -194,10 +233,10 @@ function drawWheel() {
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, r, a0, a1);
     ctx.closePath();
-    ctx.fillStyle = color;
+    ctx.fillStyle   = color;
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = THEME.segStroke;
+    ctx.lineWidth   = 1.5;
     ctx.stroke();
 
     // Radial text
@@ -206,12 +245,12 @@ function drawWheel() {
     ctx.rotate(a0 + seg / 2);
     ctx.textAlign    = 'right';
     ctx.textBaseline = 'middle';
-    ctx.shadowColor  = 'rgba(0,0,0,0.7)';
+    ctx.shadowColor  = THEME.textShadow;
     ctx.shadowBlur   = 4;
 
     const fs = Math.max(10, Math.min(16, Math.floor(r * seg / 7)));
-    ctx.font      = `bold ${fs}px Segoe UI, sans-serif`;
-    ctx.fillStyle = '#fff';
+    ctx.font      = `bold ${fs}px ${THEME.font}`;
+    ctx.fillStyle = THEME.textColor;
 
     let txt = names[i];
     const maxW = r * 0.72;
@@ -227,7 +266,7 @@ function drawWheel() {
   // Outer ring
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.strokeStyle = THEME.ringStroke;
   ctx.lineWidth   = 4;
   ctx.stroke();
 
@@ -242,7 +281,7 @@ function drawHint(cx, cy) {
   const text  = 'Click to spin';
   const fSize = 13;
   ctx.save();
-  ctx.font = `bold ${fSize}px Segoe UI, sans-serif`;
+  ctx.font = `bold ${fSize}px ${THEME.font}`;
 
   const tw   = ctx.measureText(text).width;
   const padX = 16, padY = 9;
@@ -253,7 +292,7 @@ function drawHint(cx, cy) {
   const br   = 10; // border radius
 
   // Rounded rectangle background
-  ctx.fillStyle = 'rgba(10,8,30,0.72)';
+  ctx.fillStyle = THEME.hintBg;
   ctx.beginPath();
   ctx.moveTo(bx + br, by);
   ctx.lineTo(bx + bw - br, by);
@@ -270,7 +309,7 @@ function drawHint(cx, cy) {
   // Text
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle    = 'rgba(255,255,255,0.92)';
+  ctx.fillStyle    = THEME.hintText;
   ctx.fillText(text, cx, cy);
 
   ctx.restore();
@@ -279,8 +318,8 @@ function drawHint(cx, cy) {
 function drawPointer(cx, cy, r) {
   // Pointer on the right side (angle = 0), pointing left toward the wheel
 
-  // Determine the color of the segment currently at the pointer
-  let color = '#FFD700';
+  // Determine the colour of the segment currently at the pointer
+  let color = THEME.gold;
   if (names.length >= 1) {
     const seg  = (2 * Math.PI) / names.length;
     const norm = ((-angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
@@ -292,9 +331,9 @@ function drawPointer(cx, cy, r) {
   ctx.translate(cx, cy);
 
   // Shadow for depth
-  ctx.shadowColor    = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur     = 6;
-  ctx.shadowOffsetX  = 1;
+  ctx.shadowColor   = THEME.ptrShadow;
+  ctx.shadowBlur    = 6;
+  ctx.shadowOffsetX = 1;
 
   // Left-pointing triangle: tip touches wheel rim, base sticks out to the right
   ctx.beginPath();
@@ -308,7 +347,7 @@ function drawPointer(cx, cy, r) {
 
   ctx.shadowBlur    = 0;
   ctx.shadowOffsetX = 0;
-  ctx.strokeStyle   = 'rgba(255,255,255,0.9)';
+  ctx.strokeStyle   = THEME.ptrStroke;
   ctx.lineWidth     = 2;
   ctx.stroke();
 
@@ -318,14 +357,14 @@ function drawPointer(cx, cy, r) {
 function drawEmpty(cx, cy, r) {
   ctx.beginPath();
   ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.fillStyle   = 'rgba(255,255,255,0.03)';
+  ctx.fillStyle   = THEME.emptyFill;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+  ctx.strokeStyle = THEME.emptyStroke;
   ctx.lineWidth   = 3;
   ctx.stroke();
 
-  ctx.fillStyle    = 'rgba(255,255,255,0.22)';
-  ctx.font         = '15px Segoe UI, sans-serif';
+  ctx.fillStyle    = THEME.emptyText;
+  ctx.font         = `15px ${THEME.font}`;
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('Add names to get started', cx, cy);
@@ -338,15 +377,15 @@ function drawSingleSegment(cx, cy, r) {
   ctx.arc(cx, cy, r, 0, 2 * Math.PI);
   ctx.fillStyle   = COLORS[0];
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.65)';
+  ctx.strokeStyle = THEME.ringStroke;
   ctx.lineWidth   = 4;
   ctx.stroke();
 
   ctx.save();
-  ctx.shadowColor  = 'rgba(0,0,0,0.7)';
+  ctx.shadowColor  = THEME.textShadow;
   ctx.shadowBlur   = 4;
-  ctx.fillStyle    = '#fff';
-  ctx.font         = 'bold 18px Segoe UI, sans-serif';
+  ctx.fillStyle    = THEME.textColor;
+  ctx.font         = `bold 18px ${THEME.font}`;
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(names[0], cx, cy);
@@ -357,7 +396,11 @@ function drawSingleSegment(cx, cy, r) {
 }
 
 function drawHub(cx, cy) {
-  const layers = [[24,'#fff'],[17,'#FFD700'],[8,'#1a1a2e']];
+  const layers = [
+    [24, THEME.hubOuter],
+    [17, THEME.hubMid],
+    [8,  THEME.hubInner],
+  ];
   layers.forEach(([rad, fill]) => {
     ctx.beginPath();
     ctx.arc(cx, cy, rad, 0, 2 * Math.PI);
@@ -369,7 +412,7 @@ function drawHub(cx, cy) {
 /* ── CURSOR ── */
 function updateCursor() {
   canvas.classList.remove('spinning', 'not-allowed');
-  if (spinning)          canvas.classList.add('spinning');
+  if (spinning)              canvas.classList.add('spinning');
   else if (names.length < 2) canvas.classList.add('not-allowed');
 }
 
@@ -406,34 +449,34 @@ function getAudioCtx() {
 
 function playTick(volume) {
   try {
-    const ctx      = getAudioCtx();
-    const now      = ctx.currentTime;
+    const ac       = getAudioCtx();
+    const now      = ac.currentTime;
     const duration = 0.045;
 
     // Short noise burst shaped into a click
-    const samples = Math.floor(ctx.sampleRate * duration);
-    const buffer  = ctx.createBuffer(1, samples, ctx.sampleRate);
+    const samples = Math.floor(ac.sampleRate * duration);
+    const buffer  = ac.createBuffer(1, samples, ac.sampleRate);
     const data    = buffer.getChannelData(0);
     for (let i = 0; i < samples; i++) {
       // White noise that decays sharply → click sound
       data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / samples, 6);
     }
 
-    const source = ctx.createBufferSource();
+    const source = ac.createBufferSource();
     source.buffer = buffer;
 
     // High-pass filter: remove low rumble, keep crisp click
-    const filter       = ctx.createBiquadFilter();
-    filter.type        = 'highpass';
+    const filter           = ac.createBiquadFilter();
+    filter.type            = 'highpass';
     filter.frequency.value = 1200;
 
-    const gain = ctx.createGain();
+    const gain = ac.createGain();
     gain.gain.setValueAtTime(volume * 0.5, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     source.connect(filter);
     filter.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(ac.destination);
     source.start(now);
   } catch (_) { /* audio unavailable */ }
 }
@@ -451,7 +494,7 @@ function spin() {
   const seg       = (2 * Math.PI) / n;
   const winnerIdx = Math.floor(Math.random() * n);
 
-  // Center of winner's segment should land at 0 (right = pointer)
+  // Center of winner's segment should land at angle 0 (right = pointer)
   const winnerCenter = winnerIdx * seg + seg / 2;
   let targetAngle    = -winnerCenter;
 
@@ -489,7 +532,7 @@ function spin() {
     if (p < 1) {
       requestAnimationFrame(frame);
     } else {
-      // Normalize angle to [0, 2π) to prevent float accumulation
+      // Normalise angle to [0, 2π) to prevent float accumulation
       angle      = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
       spinning   = false;
       lastWinner = winnerIdx;
@@ -529,6 +572,7 @@ function removeWinner() {
 function renderRemoved() {
   const section  = document.getElementById('pastSection');
   const pastList = document.getElementById('pastList');
+  const tmpl     = document.getElementById('tmpl-past-item').content;
 
   if (removed.length === 0) {
     section.classList.remove('visible');
@@ -539,9 +583,11 @@ function renderRemoved() {
   pastList.innerHTML = '';
 
   removed.forEach(name => {
-    const li = document.createElement('li');
-    li.innerHTML = `<span class="past-name" title="${esc(name)}">${esc(name)}</span>`;
-    pastList.appendChild(li);
+    const frag = tmpl.cloneNode(true);
+    const span = frag.querySelector('.past-name');
+    span.textContent = name;  // textContent auto-escapes — no manual escaping needed
+    span.title       = name;
+    pastList.appendChild(frag);
   });
 }
 

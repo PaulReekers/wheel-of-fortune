@@ -38,16 +38,16 @@
 
     <div class="input-row">
       <input type="text" id="nameInput" placeholder="Enter name..." maxlength="25" autocomplete="off">
-      <button class="btn-add" onclick="addName()">+ Add</button>
+      <button class="btn-add">+ Add</button>
     </div>
 
-    <button class="bulk-toggle" id="bulkToggle" onclick="toggleBulk()">▼ Paste total list</button>
+    <button class="bulk-toggle" id="bulkToggle">▼ Paste total list</button>
 
     <div class="bulk-area" id="bulkArea">
       <textarea id="bulkInput" placeholder="Paste your names here, one per line:&#10;&#10;Paul&#10;Frank&#10;Guido&#10;Anke"></textarea>
       <div class="bulk-row">
-        <button class="btn-bulk-add" onclick="addBulk()">+ Add all</button>
-        <button class="btn-bulk-clear" onclick="clearBulk()">Clear</button>
+        <button class="btn-bulk-add">+ Add all</button>
+        <button class="btn-bulk-clear">Clear</button>
       </div>
     </div>
 
@@ -58,7 +58,7 @@
     <div class="past-section" id="pastSection">
       <div class="past-header">
         <span class="past-title">✓ Past participants</span>
-        <button class="btn-clear-past" onclick="clearPast()">Clear</button>
+        <button class="btn-clear-past">Clear</button>
       </div>
       <ol class="past-list" id="pastList"></ol>
     </div>
@@ -67,16 +67,33 @@
 </div>
 
 <!-- Winner modal -->
-<div class="overlay" id="overlay" onclick="overlayClick(event)">
+<div class="overlay" id="overlay">
   <div class="modal" id="modal">
     <p class="modal-label">The winner is</p>
     <div class="modal-name" id="modalName"></div>
     <div class="modal-buttons">
-      <button class="btn-close" onclick="closeModal()">Keep &amp; Close</button>
-      <button class="btn-remove" onclick="removeWinner()">✕ Remove from wheel</button>
+      <button class="btn-close">Keep &amp; Close</button>
+      <button class="btn-remove">✕ Remove from wheel</button>
     </div>
   </div>
 </div>
+
+<!-- List item templates (used by app.js — no logic here, just structure) -->
+<template id="tmpl-name-item">
+  <li>
+    <div class="name-inner">
+      <span class="color-dot"></span>
+      <span class="name-label"></span>
+    </div>
+    <button class="btn-del" aria-label="Remove">✕</button>
+  </li>
+</template>
+
+<template id="tmpl-past-item">
+  <li>
+    <span class="past-name"></span>
+  </li>
+</template>
 
 <!-- JavaScript -->
 <script src="js/app.js"></script>

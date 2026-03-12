@@ -1,3 +1,52 @@
+/* ── DESIGN TOKENS ── */
+:root {
+  /* Brand colours */
+  --wof-gold:           #FFD700;
+  --wof-dark:           #1a1a2e;
+  --wof-font:           Segoe UI, Tahoma, Geneva, Verdana, sans-serif;
+
+  /* Canvas — segment styling */
+  --wof-seg-stroke:     rgba(255,255,255,0.4);
+  --wof-ring-stroke:    rgba(255,255,255,0.65);
+  --wof-text-color:     #ffffff;
+  --wof-text-shadow:    rgba(0,0,0,0.7);
+
+  /* Canvas — hub */
+  --wof-hub-outer:      #ffffff;
+  --wof-hub-mid:        #FFD700;
+  --wof-hub-inner:      #1a1a2e;
+
+  /* Canvas — pointer */
+  --wof-pointer-stroke: rgba(255,255,255,0.9);
+  --wof-pointer-shadow: rgba(0,0,0,0.5);
+
+  /* Canvas — hint pill */
+  --wof-hint-bg:        rgba(10,8,30,0.72);
+  --wof-hint-text:      rgba(255,255,255,0.92);
+
+  /* Canvas — empty state */
+  --wof-empty-fill:     rgba(255,255,255,0.03);
+  --wof-empty-stroke:   rgba(255,255,255,0.12);
+  --wof-empty-text:     rgba(255,255,255,0.22);
+
+  /* Segment colour palette — 15 colours (edit here to reskin the wheel) */
+  --wof-c-0:  #e74c3c;
+  --wof-c-1:  #3498db;
+  --wof-c-2:  #2ecc71;
+  --wof-c-3:  #f39c12;
+  --wof-c-4:  #9b59b6;
+  --wof-c-5:  #1abc9c;
+  --wof-c-6:  #e67e22;
+  --wof-c-7:  #e91e63;
+  --wof-c-8:  #00bcd4;
+  --wof-c-9:  #8bc34a;
+  --wof-c-10: #ff5722;
+  --wof-c-11: #607d8b;
+  --wof-c-12: #673ab7;
+  --wof-c-13: #4caf50;
+  --wof-c-14: #ff9800;
+}
+
 /* ── RESET & BASE ── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
