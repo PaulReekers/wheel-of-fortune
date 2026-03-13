@@ -494,6 +494,9 @@ class WheelApp {
     const maxW = window.innerWidth  - hPad;
     const size = Math.max(c.minSize, Math.min(maxH, maxW, c.maxSize));
 
+    if (size === this._lastSize) return;
+    this._lastSize = size;
+
     this._renderer.setSize(size);
     this._renderer.draw(this._names, this._angle);
   }
