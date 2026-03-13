@@ -63,13 +63,23 @@
   --wof-c-12: #673ab7;
   --wof-c-13: #4caf50;
   --wof-c-14: #ff9800;
+
+  /* UI overlay tokens — reusable semi-transparent white tints */
+  --ui-white-04: rgba(255,255,255,0.04);
+  --ui-white-08: rgba(255,255,255,0.08);
+  --ui-white-18: rgba(255,255,255,0.18);
+  --ui-white-40: rgba(255,255,255,0.40);
+
+  /* Layout — names panel geometry */
+  --names-panel-width:  300px;  /* width of the fixed right panel */
+  --names-panel-offset: 360px;  /* panel width (300) + panel right gap (20) + breathing room (40) */
 }
 
 /* ── RESET & BASE ── */
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--wof-font);
   background: linear-gradient(160deg, #0f0c29, #302b63, #24243e);
   min-height: 100vh;
   color: #fff;
@@ -103,7 +113,7 @@ header p {
   justify-content: center;
   align-items: center;
   min-height: calc(100vh - 80px);
-  padding: 20px 360px 20px 20px; /* right side makes room for fixed names panel */
+  padding: 20px var(--names-panel-offset) 20px 20px; /* right padding reserves space for the fixed names panel */
 }
 
 /* ── WHEEL ── */
@@ -156,7 +166,7 @@ header p {
   opacity: 0;
 }
 
-canvas#wheel {
+#wheel {
   display: block;
   border-radius: 50%;
   cursor: pointer;
@@ -167,15 +177,16 @@ canvas#wheel {
   transition: box-shadow .3s;
 }
 
-canvas#wheel:hover {
+#wheel:hover {
   box-shadow:
     0 0 0 5px rgba(255,215,0,0.45),
     0 0 0 10px rgba(255,215,0,0.15),
     0 18px 55px rgba(0,0,0,0.6);
 }
 
-canvas#wheel.not-allowed { cursor: not-allowed; }
-canvas#wheel.spinning    { cursor: default; }
+/* Cursor states are driven by data-wheel-state on the wrapper — set by JS */
+.wheel-wrapper[data-wheel-state="empty"]    #wheel { cursor: not-allowed; }
+.wheel-wrapper[data-wheel-state="spinning"] #wheel { cursor: default; }
 
 /* ── NAMES PANEL ── */
 .names-panel {
@@ -186,13 +197,16 @@ canvas#wheel.spinning    { cursor: default; }
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   z-index: 100;
-  width: 300px;
+  width: var(--names-panel-width);
   background: rgba(255,255,255,0.05);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 20px;
   padding: 22px;
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,215,0,0.35) transparent;
 }
 
 .names-panel::-webkit-scrollbar { width: 3px; }
@@ -219,7 +233,7 @@ canvas#wheel.spinning    { cursor: default; }
   min-width: 0;
   padding: 10px 13px;
   background: rgba(255,255,255,0.09);
-  border: 1.5px solid rgba(255,255,255,0.18);
+  border: 1.5px solid var(--ui-white-18);
   border-radius: 10px;
   color: #fff;
   font-size: 0.9rem;
@@ -250,16 +264,32 @@ canvas#wheel.spinning    { cursor: default; }
   box-shadow: 0 4px 15px rgba(78,205,196,0.4);
 }
 
+/* ── ANIMATIONS ── */
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Entrance animation — utility class and auto-applied to all list item elements */
+.anim-fade-slide,
+.names-list li,
+.past-list li {
+  animation: fadeSlide .22s ease;
+}
+
 /* ── NAMES LIST ── */
 .names-list {
   list-style: none;
   max-height: 370px;
   overflow-y: auto;
   padding-right: 2px;
+  /* Firefox scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: #FFD700 var(--ui-white-04);
 }
 
 .names-list::-webkit-scrollbar { width: 3px; }
-.names-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 2px; }
+.names-list::-webkit-scrollbar-track { background: var(--ui-white-04); border-radius: 2px; }
 .names-list::-webkit-scrollbar-thumb { background: #FFD700; border-radius: 2px; }
 
 .names-list li {
@@ -271,12 +301,6 @@ canvas#wheel.spinning    { cursor: default; }
   border-radius: 9px;
   background: rgba(255,255,255,0.06);
   border-left: 4px solid var(--item-color, transparent);
-  animation: fadeSlide .22s ease;
-}
-
-@keyframes fadeSlide {
-  from { opacity: 0; transform: translateX(-12px); }
-  to   { opacity: 1; transform: translateX(0); }
 }
 
 .name-inner { display: flex; align-items: center; gap: 9px; overflow: hidden; min-width: 0; }
@@ -317,7 +341,7 @@ canvas#wheel.spinning    { cursor: default; }
   margin-top: 12px;
   text-align: center;
   font-size: 0.78rem;
-  color: rgba(255,255,255,0.4);
+  color: var(--ui-white-40);
 }
 
 .status-msg.warn { color: #ff8a80; }
@@ -356,7 +380,7 @@ canvas#wheel.spinning    { cursor: default; }
   height: 110px;
   padding: 10px 13px;
   background: rgba(255,255,255,0.09);
-  border: 1.5px solid rgba(255,255,255,0.18);
+  border: 1.5px solid var(--ui-white-18);
   border-radius: 10px;
   color: #fff;
   font-size: 0.88rem;
@@ -395,7 +419,7 @@ canvas#wheel.spinning    { cursor: default; }
 
 .btn-bulk-clear {
   padding: 9px 13px;
-  background: rgba(255,255,255,0.08);
+  background: var(--ui-white-08);
   color: rgba(255,255,255,0.5);
   border: 1px solid rgba(255,255,255,0.15);
   border-radius: 10px;
@@ -510,7 +534,7 @@ canvas#wheel.spinning    { cursor: default; }
 .past-section {
   display: none;
   margin-top: 18px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid var(--ui-white-08);
   padding-top: 14px;
 }
 
@@ -527,7 +551,7 @@ canvas#wheel.spinning    { cursor: default; }
   font-size: 0.78rem;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: rgba(255,255,255,0.4);
+  color: var(--ui-white-40);
 }
 
 .btn-clear-past {
@@ -563,7 +587,6 @@ canvas#wheel.spinning    { cursor: default; }
   border-radius: 7px;
   background: rgba(255,255,255,0.03);
   border-left: 3px solid rgba(255,215,0,0.35);
-  animation: fadeSlide .22s ease;
   counter-increment: past-counter;
 }
 

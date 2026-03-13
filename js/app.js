@@ -1,649 +1,791 @@
 'use strict';
 
-/* ── THEME ────────────────────────────────────────────────────────────────────
-   All colours and the font are defined as CSS custom properties in style.css.
-   loadTheme() reads them once at startup so the canvas can use them.
-   To change the look of the wheel, edit the :root block in style.css only.
+/* ── CONFIG ──────────────────────────────────────────────────────────────────
+   Single source of truth for all constants and behavioural values.
+   Visual values belong in style.css (:root). Behaviour values live here.
 ────────────────────────────────────────────────────────────────────────────── */
-let COLORS = [];   // segment palette, populated by loadTheme()
-let THEME  = {};   // canvas style values, populated by loadTheme()
 
-function loadTheme() {
-  const v = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  const n = name => parseFloat(v(name)); // shorthand for numeric vars
-
-  // Segment colour palette (--wof-c-0 … --wof-c-14)
-  COLORS = Array.from({ length: 15 }, (_, i) => v(`--wof-c-${i}`));
-
-  // All canvas styles — edit values in style.css :root, not here
-  THEME = {
-    // Brand
-    gold:            v('--wof-gold'),
-    dark:            v('--wof-dark'),
-    font:            v('--wof-font') || 'Segoe UI, sans-serif',
-
-    // Segment labels
-    segStroke:       v('--wof-seg-stroke'),
-    segLineWidth:    n('--wof-seg-line-width'),
-    ringStroke:      v('--wof-ring-stroke'),
-    ringLineWidth:   n('--wof-ring-line-width'),
-    textColor:       v('--wof-text-color'),
-    textWeight:      v('--wof-text-weight'),
-    textShadow:      v('--wof-text-shadow'),
-    textShadowBlur:  n('--wof-text-shadow-blur'),
-    textAlign:       v('--wof-text-align'),
-    textAlignCenter: v('--wof-text-align-center'),
-    textBaseline:    v('--wof-text-baseline'),
-    textOffset:      n('--wof-text-offset'),
-    textMaxWidth:    n('--wof-text-max-width'),
-    nameSize:        n('--wof-name-size') || 1,
-
-    // Single segment label
-    singleSize:      n('--wof-single-size'),
-
-    // Hub
-    hubOuter:        v('--wof-hub-outer'),
-    hubMid:          v('--wof-hub-mid'),
-    hubInner:        v('--wof-hub-inner'),
-    hubR1:           n('--wof-hub-r1'),
-    hubR2:           n('--wof-hub-r2'),
-    hubR3:           n('--wof-hub-r3'),
-
-    // Pointer
-    ptrStroke:       v('--wof-pointer-stroke'),
-    ptrShadow:       v('--wof-pointer-shadow'),
-    ptrShadowBlur:   n('--wof-pointer-shadow-blur'),
-    ptrShadowX:      n('--wof-pointer-shadow-x'),
-    ptrLineWidth:    n('--wof-pointer-line-width'),
-    ptrOverlap:      n('--wof-pointer-overlap'),
-    ptrReach:        n('--wof-pointer-reach'),
-    ptrHeight:       n('--wof-pointer-height'),
-
-    // Empty state (circle + pointer; text is an HTML overlay — see #emptyHint)
-    emptyFill:       v('--wof-empty-fill'),
-    emptyStroke:     v('--wof-empty-stroke'),
-    emptyLineWidth:  n('--wof-empty-line-width'),
-  };
-}
-
-/* ── CONSTANTS ────────────────────────────────────────────────────────────────
-   Magic numbers live here — not scattered through the code.
-────────────────────────────────────────────────────────────────────────────── */
-const STORAGE_KEY         = 'wof_names_v1';
-const STORAGE_KEY_REMOVED = 'wof_removed_v1';
-
-// Canvas layout
-const CANVAS_MARGIN       = 30;    // px between wheel rim and canvas edge (room for pointer)
-const CANVAS_MIN_SIZE     = 240;   // minimum canvas size in px
-const CANVAS_MAX_SIZE     = 900;   // maximum canvas size in px
-const CANVAS_PANEL_WIDTH  = 340;   // desktop panel width + its margins
-const CANVAS_BREAKPOINT   = 680;   // px — below this the panel stacks vertically
-
-// Spin animation
-const SPIN_MIN_ROTATIONS  = 3;     // minimum full rotations before stopping
-const SPIN_ROTATION_RANGE = 3;     // random extra rotations added on top (0 … range-1)
-const SPIN_MIN_DURATION   = 4000;  // ms — minimum spin duration
-const SPIN_EXTRA_DURATION = 1500;  // ms — random extra duration
-const SPIN_WINNER_DELAY   = 300;   // ms — pause before showing the winner modal
-
-// Tick sound
-const TICK_DURATION       = 0.045; // seconds — length of each click sound
-const TICK_FILTER_FREQ    = 1200;  // Hz — high-pass filter cutoff
-const TICK_GAIN_FACTOR    = 0.5;   // master gain multiplier per tick
-const TICK_VOLUME_MIN     = 0.1;   // minimum tick volume at end of spin
-const TICK_VOLUME_FADE    = 0.88;  // how fast volume fades as the wheel slows
-const TICK_MAX_CROSSINGS  = 4;     // max ticks fired per animation frame
-const TICK_STAGGER_MS     = 12;    // ms between staggered ticks in one frame
-
-// Idle rotation
-const IDLE_SPEED          = 0.00018; // rad/ms ≈ one full rotation every ~35 seconds
-
-// UI
-const RESIZE_DEBOUNCE     = 150;   // ms — debounce delay for the window resize handler
-
-/* ── UI STRINGS ── */
-const MSG_MIN_NAMES = 'Add at least 2 names.';
-const MSG_ONE_NAME  = '1 participant — add at least 1 more.';
-
-/* ── STATE ── */
-const state = {
-  names:      [],    // participant names currently on the wheel
-  removed:    [],    // past participants (removed after being picked)
-  angle:      0,     // current wheel rotation in radians
-  spinning:   false,
-  lastWinner: -1,    // index of the last winner (used for removal)
-  idleRaf:    null,  // requestAnimationFrame handle for idle rotation
-  hasSpun:    false, // true after the first spin — hides the "Click to spin" hint
+const CONFIG = {
+  storage: {
+    names:   'wof_names_v1',
+    removed: 'wof_removed_v1',
+  },
+  canvas: {
+    margin:      30,   // px — gap between wheel rim and canvas edge (room for pointer)
+    minSize:     240,  // px — smallest the canvas will shrink to
+    maxSize:     900,  // px — largest the canvas will grow to
+    panelWidth:  340,  // px — desktop panel width + its margins
+    hPadDesktop: 60,   // px — horizontal breathing room on desktop
+    hPadMobile:  40,   // px — horizontal breathing room on mobile
+    vPad:        60,   // px — vertical breathing room
+  },
+  spin: {
+    minRotations:  3,     // full rotations before the wheel may stop
+    rotationRange: 3,     // random extra rotations added on top (0 … range-1)
+    minDuration:   4000,  // ms
+    extraDuration: 1500,  // ms random extra
+    winnerDelay:   300,   // ms pause before the winner modal appears
+  },
+  tick: {
+    duration:     0.045,  // s — length of each click sound
+    filterFreq:   1200,   // Hz — high-pass filter cutoff
+    gainFactor:   0.5,    // master gain multiplier
+    volumeMin:    0.1,    // minimum volume at the end of the spin
+    volumeFade:   0.88,   // how fast volume fades as the wheel slows
+    maxCrossings: 4,      // max ticks fired per animation frame
+    staggerMs:    12,     // ms between staggered ticks in one frame
+  },
+  idle: {
+    speed: 0.00018, // rad/ms ≈ one full rotation every ~35 s
+  },
 };
 
-/* ── DOM ── */
-const DOM = {
-  canvas:       document.getElementById('wheel'),
-  nameInput:    document.getElementById('nameInput'),
-  namesList:    document.getElementById('namesList'),
-  statusMsg:    document.getElementById('statusMsg'),
-  bulkToggle:   document.getElementById('bulkToggle'),
-  bulkArea:     document.getElementById('bulkArea'),
-  bulkInput:    document.getElementById('bulkInput'),
-  spinHint:     document.getElementById('spinHint'),
-  emptyHint:    document.getElementById('emptyHint'),
-  overlay:      document.getElementById('overlay'),
-  modalName:    document.getElementById('modalName'),
-  pastSection:  document.getElementById('pastSection'),
-  pastList:     document.getElementById('pastList'),
-  header:       document.querySelector('header'),
-  btnAdd:       document.querySelector('.btn-add'),
-  btnBulkAdd:   document.querySelector('.btn-bulk-add'),
-  btnBulkClear: document.querySelector('.btn-bulk-clear'),
-  btnClearPast: document.querySelector('.btn-clear-past'),
-  btnClose:     document.querySelector('.btn-close'),
-  btnRemove:    document.querySelector('.btn-remove'),
-  tmplNameItem: document.getElementById('tmpl-name-item').content,
-  tmplPastItem: document.getElementById('tmpl-past-item').content,
-};
+/* ── THEME ───────────────────────────────────────────────────────────────────
+   Reads all canvas-relevant values from CSS custom properties.
+   All visual values are owned by style.css — this class is the bridge
+   between the stylesheet and the Canvas 2D API.
+────────────────────────────────────────────────────────────────────────────── */
 
-const ctx = DOM.canvas.getContext('2d');
-
-/* ── INIT ── */
-(function init() {
-  loadTheme();
-
-  // Restore saved data
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    state.names = Array.isArray(stored)
-      ? stored.filter(n => typeof n === 'string' && n.trim().length > 0)
-      : [];
-  } catch (err) {
-    console.warn('Failed to load names from localStorage', err);
-    state.names = [];
+class Theme {
+  constructor() {
+    /** @type {string[]} Segment colour palette */
+    this.colors = [];
+    /** @type {object} Canvas style values */
+    this.values = {};
   }
 
-  try {
-    const storedRemoved = JSON.parse(localStorage.getItem(STORAGE_KEY_REMOVED) || '[]');
-    state.removed = Array.isArray(storedRemoved)
-      ? storedRemoved.filter(n => typeof n === 'string' && n.trim().length > 0)
-      : [];
-  } catch (err) {
-    console.warn('Failed to load removed names from localStorage', err);
-    state.removed = [];
-  }
+  /**
+   * (Re-)reads every CSS custom property from :root.
+   * Call once at startup; call again after any live CSS change (e.g. resize
+   * could change --wof-name-size via a media query).
+   */
+  load() {
+    const cs = getComputedStyle(document.documentElement);
+    const v  = name => cs.getPropertyValue(name).trim();
+    const n  = name => parseFloat(v(name));
 
-  // Event listeners — all wired here, no onclick in HTML
-  DOM.nameInput   .addEventListener('keydown', e => { if (e.key === 'Enter') addName(); });
-  DOM.btnAdd      .addEventListener('click', addName);
-  DOM.bulkToggle  .addEventListener('click', toggleBulk);
-  DOM.btnBulkAdd  .addEventListener('click', addBulk);
-  DOM.btnBulkClear.addEventListener('click', clearBulk);
-  DOM.btnClearPast.addEventListener('click', clearPast);
-  DOM.overlay     .addEventListener('click', overlayClick);
-  DOM.btnClose    .addEventListener('click', closeModal);
-  DOM.btnRemove   .addEventListener('click', removeWinner);
-  DOM.canvas      .addEventListener('click', () => spin());
-  window          .addEventListener('resize', debounce(resize, RESIZE_DEBOUNCE));
+    // Segment colour palette (--wof-c-0 … --wof-c-14)
+    this.colors = Array.from({ length: 15 }, (_, i) => v(`--wof-c-${i}`));
 
-  resize();
-  renderList();
-  renderRemoved();
-  startIdleRotation();
-})();
+    // All canvas styles — edit values in style.css :root, not here
+    this.values = {
+      gold:            v('--wof-gold'),
+      dark:            v('--wof-dark'),
+      font:            v('--wof-font') || 'Segoe UI, sans-serif',
 
-/* ── PERSISTENCE ── */
-function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.names));
-}
+      segStroke:       v('--wof-seg-stroke'),
+      segLineWidth:    n('--wof-seg-line-width'),
+      ringStroke:      v('--wof-ring-stroke'),
+      ringLineWidth:   n('--wof-ring-line-width'),
+      textColor:       v('--wof-text-color'),
+      textWeight:      v('--wof-text-weight'),
+      textShadow:      v('--wof-text-shadow'),
+      textShadowBlur:  n('--wof-text-shadow-blur'),
+      textAlign:       v('--wof-text-align'),
+      textAlignCenter: v('--wof-text-align-center'),
+      textBaseline:    v('--wof-text-baseline'),
+      textOffset:      n('--wof-text-offset'),
+      textMaxWidth:    n('--wof-text-max-width'),
+      nameSize:        n('--wof-name-size') || 1,
 
-function saveRemoved() {
-  localStorage.setItem(STORAGE_KEY_REMOVED, JSON.stringify(state.removed));
-}
+      singleSize:      n('--wof-single-size'),
 
-/* ── DATA ── */
-function addName() {
-  const value = DOM.nameInput.value.trim();
-  if (!value) { DOM.nameInput.focus(); return; }
-  state.names.push(value);
-  DOM.nameInput.value = '';
-  DOM.nameInput.focus();
-  save();
-  renderList();
-  drawWheel();
-}
+      hubOuter:        v('--wof-hub-outer'),
+      hubMid:          v('--wof-hub-mid'),
+      hubInner:        v('--wof-hub-inner'),
+      hubR1:           n('--wof-hub-r1'),
+      hubR2:           n('--wof-hub-r2'),
+      hubR3:           n('--wof-hub-r3'),
 
-function removeName(i) {
-  state.names.splice(i, 1);
-  save();
-  renderList();
-  drawWheel();
-}
+      ptrStroke:       v('--wof-pointer-stroke'),
+      ptrShadow:       v('--wof-pointer-shadow'),
+      ptrShadowBlur:   n('--wof-pointer-shadow-blur'),
+      ptrShadowX:      n('--wof-pointer-shadow-x'),
+      ptrLineWidth:    n('--wof-pointer-line-width'),
+      ptrOverlap:      n('--wof-pointer-overlap'),
+      ptrReach:        n('--wof-pointer-reach'),
+      ptrHeight:       n('--wof-pointer-height'),
 
-/* ── BULK ADD ── */
-function toggleBulk() {
-  const isOpen = DOM.bulkArea.classList.toggle('open');
-  DOM.bulkToggle.classList.toggle('open', isOpen);
-  if (isOpen) DOM.bulkInput.focus();
-}
-
-function addBulk() {
-  const added = DOM.bulkInput.value
-    .split('\n')
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && s.length <= 25);
-
-  if (added.length === 0) return;
-
-  state.names.push(...added);
-  save();
-  renderList();
-  drawWheel();
-
-  DOM.bulkInput.value = '';
-  DOM.bulkArea.classList.remove('open');
-  DOM.bulkToggle.classList.remove('open');
-}
-
-function clearBulk() {
-  DOM.bulkInput.value = '';
-  DOM.bulkInput.focus();
-}
-
-/* ── LIST UI ── */
-function renderList() {
-  DOM.namesList.innerHTML = '';
-
-  state.names.forEach((name, i) => {
-    const color  = COLORS[i % COLORS.length];
-    const frag   = DOM.tmplNameItem.cloneNode(true);
-    const li     = frag.querySelector('li');
-    const dot    = frag.querySelector('.color-dot');
-    const label  = frag.querySelector('.name-label');
-    const btnDel = frag.querySelector('.btn-del');
-
-    li.style.setProperty('--item-color', color);
-    label.textContent        = name;  // textContent auto-escapes — no manual escaping needed
-    label.title              = name;
-    btnDel.addEventListener('click', () => removeName(i));
-
-    DOM.namesList.appendChild(frag);
-  });
-
-  const count = state.names.length;
-  DOM.statusMsg.textContent = count === 0 ? MSG_MIN_NAMES
-                            : count === 1 ? MSG_ONE_NAME
-                            : `${count} participants`;
-  DOM.statusMsg.classList.toggle('warn', count < 2);
-
-  updateCursor();
-}
-
-/* ── CANVAS LAYOUT ── */
-function resize() {
-  const isMobile = window.innerWidth <= CANVAS_BREAKPOINT;
-  const headerH  = DOM.header?.offsetHeight ?? 80;
-  const vPad     = 60;
-  const hPad     = isMobile ? 40 : 60;
-  const panelW   = isMobile ? 0 : CANVAS_PANEL_WIDTH;
-
-  const maxH = window.innerHeight - headerH - vPad;
-  const maxW = window.innerWidth  - panelW  - hPad;
-  const size = Math.max(CANVAS_MIN_SIZE, Math.min(maxH, maxW, CANVAS_MAX_SIZE));
-
-  DOM.canvas.width  = size;
-  DOM.canvas.height = size;
-  drawWheel();
-}
-
-/* ── CANVAS DRAW ── */
-function drawWheel() {
-  const W  = DOM.canvas.width;
-  const H  = DOM.canvas.height;
-  const cx = W / 2;
-  const cy = H / 2;
-  const r  = Math.min(cx, cy) - CANVAS_MARGIN;
-
-  ctx.clearRect(0, 0, W, H);
-
-  if (state.names.length === 0) { drawEmpty(cx, cy, r); return; }
-  if (state.names.length === 1) { drawSingleSegment(cx, cy, r); return; }
-
-  const segmentAngle = (2 * Math.PI) / state.names.length;
-
-  drawSegments(cx, cy, r, segmentAngle);
-  drawOuterRing(cx, cy, r);
-  drawHub(cx, cy);
-  drawPointer(cx, cy, r);
-}
-
-function drawSegments(cx, cy, r, segmentAngle) {
-  for (let i = 0; i < state.names.length; i++) {
-    const startAngle = state.angle + i * segmentAngle;
-    const endAngle   = startAngle + segmentAngle;
-    const color      = COLORS[i % COLORS.length];
-
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.arc(cx, cy, r, startAngle, endAngle);
-    ctx.closePath();
-    ctx.fillStyle   = color;
-    ctx.fill();
-    ctx.strokeStyle = THEME.segStroke;
-    ctx.lineWidth   = THEME.segLineWidth;
-    ctx.stroke();
-
-    drawSegmentLabel(cx, cy, r, startAngle, segmentAngle, i);
+      emptyFill:       v('--wof-empty-fill'),
+      emptyStroke:     v('--wof-empty-stroke'),
+      emptyLineWidth:  n('--wof-empty-line-width'),
+    };
   }
 }
 
-function drawSegmentLabel(cx, cy, r, startAngle, segmentAngle, i) {
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(startAngle + segmentAngle / 2);
-  ctx.textAlign    = THEME.textAlign;
-  ctx.textBaseline = THEME.textBaseline;
-  ctx.shadowColor  = THEME.textShadow;
-  ctx.shadowBlur   = THEME.textShadowBlur;
+/* ── AUDIO MANAGER ───────────────────────────────────────────────────────────
+   Lazy-initialised Web Audio context.
+   Generates a short noise-based click for each segment boundary crossing.
+────────────────────────────────────────────────────────────────────────────── */
 
-  const fontSize = Math.max(10, Math.round(Math.min(r * segmentAngle / 7, r * 0.07) * THEME.nameSize));
-  ctx.font      = `${THEME.textWeight} ${fontSize}px ${THEME.font}`;
-  ctx.fillStyle = THEME.textColor;
-
-  let label    = state.names[i];
-  const maxWidth = r * THEME.textMaxWidth;
-  while (ctx.measureText(label).width > maxWidth && label.length > 2) {
-    label = label.slice(0, -1);
-  }
-  if (label.length < state.names[i].length) label += '…';
-
-  ctx.fillText(label, r - THEME.textOffset, 0);
-  ctx.restore();
-}
-
-function drawOuterRing(cx, cy, r) {
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.strokeStyle = THEME.ringStroke;
-  ctx.lineWidth   = THEME.ringLineWidth;
-  ctx.stroke();
-}
-
-function drawPointer(cx, cy, r) {
-  // Pointer sits on the right side (angle = 0), tip overlaps into the wheel
-
-  // Match pointer colour to the segment currently under it
-  let color = THEME.gold;
-  if (state.names.length >= 1) {
-    const segmentAngle    = (2 * Math.PI) / state.names.length;
-    const normalizedAngle = ((-state.angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-    const segmentIndex    = Math.floor(normalizedAngle / segmentAngle) % state.names.length;
-    color = COLORS[segmentIndex % COLORS.length];
+class AudioManager {
+  /** @param {object} config  Full CONFIG object */
+  constructor(config) {
+    this._cfg = config.tick;
+    this._ctx = null;
   }
 
-  ctx.save();
-  ctx.translate(cx, cy);
-
-  ctx.shadowColor   = THEME.ptrShadow;
-  ctx.shadowBlur    = THEME.ptrShadowBlur;
-  ctx.shadowOffsetX = THEME.ptrShadowX;
-
-  ctx.beginPath();
-  ctx.moveTo(r - THEME.ptrOverlap,  0);               // tip — inside the wheel
-  ctx.lineTo(r + THEME.ptrReach,   -THEME.ptrHeight);  // top-right
-  ctx.lineTo(r + THEME.ptrReach,    THEME.ptrHeight);  // bottom-right
-  ctx.closePath();
-
-  ctx.fillStyle = color;
-  ctx.fill();
-
-  ctx.shadowBlur    = 0;
-  ctx.shadowOffsetX = 0;
-  ctx.strokeStyle   = THEME.ptrStroke;
-  ctx.lineWidth     = THEME.ptrLineWidth;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-function drawEmpty(cx, cy, r) {
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.fillStyle   = THEME.emptyFill;
-  ctx.fill();
-  ctx.strokeStyle = THEME.emptyStroke;
-  ctx.lineWidth   = THEME.emptyLineWidth;
-  ctx.stroke();
-
-  // "Add names to get started" is an HTML overlay — see #emptyHint in index.html
-  drawPointer(cx, cy, r);
-}
-
-function drawSingleSegment(cx, cy, r) {
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, 0, 2 * Math.PI);
-  ctx.fillStyle   = COLORS[0];
-  ctx.fill();
-  ctx.strokeStyle = THEME.ringStroke;
-  ctx.lineWidth   = THEME.ringLineWidth;
-  ctx.stroke();
-
-  ctx.save();
-  ctx.shadowColor  = THEME.textShadow;
-  ctx.shadowBlur   = THEME.textShadowBlur;
-  ctx.fillStyle    = THEME.textColor;
-  ctx.font         = `${THEME.textWeight} ${THEME.singleSize}px ${THEME.font}`;
-  ctx.textAlign    = THEME.textAlignCenter;
-  ctx.textBaseline = THEME.textBaseline;
-  ctx.fillText(state.names[0], cx, cy);
-  ctx.restore();
-
-  drawHub(cx, cy);
-  drawPointer(cx, cy, r);
-}
-
-function drawHub(cx, cy) {
-  const layers = [
-    [THEME.hubR1, THEME.hubOuter],
-    [THEME.hubR2, THEME.hubMid],
-    [THEME.hubR3, THEME.hubInner],
-  ];
-  layers.forEach(([radius, fill]) => {
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-    ctx.fillStyle = fill;
-    ctx.fill();
-  });
-}
-
-/* ── CURSOR + HINT ── */
-function updateCursor() {
-  DOM.canvas.classList.remove('spinning', 'not-allowed');
-  if (state.spinning)              DOM.canvas.classList.add('spinning');
-  else if (state.names.length < 2) DOM.canvas.classList.add('not-allowed');
-
-  DOM.spinHint.classList.toggle('hidden',  state.hasSpun || state.spinning || state.names.length < 2);
-  DOM.emptyHint.classList.toggle('hidden', state.names.length !== 0);
-}
-
-/* ── IDLE ROTATION ── */
-function startIdleRotation() {
-  if (state.idleRaf) return; // already running
-  let lastTime = null;
-
-  function idleFrame(t) {
-    if (state.spinning) { state.idleRaf = null; return; } // spin animation takes over
-    if (lastTime !== null) {
-      state.angle = (state.angle + IDLE_SPEED * (t - lastTime)) % (2 * Math.PI);
-      drawWheel();
+  /** @returns {AudioContext} */
+  _getCtx() {
+    if (!this._ctx) {
+      this._ctx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    lastTime      = t;
-    state.idleRaf = requestAnimationFrame(idleFrame);
+    if (this._ctx.state === 'suspended') this._ctx.resume();
+    return this._ctx;
   }
 
-  state.idleRaf = requestAnimationFrame(idleFrame);
-}
+  /**
+   * Synthesises and plays a short click at the given volume.
+   * White noise through an exponential decay envelope and a high-pass filter
+   * keeps the sound crisp without low-frequency rumble.
+   * @param {number} volume  0–1
+   */
+  playTick(volume) {
+    try {
+      const { duration, filterFreq, gainFactor } = this._cfg;
+      const ac      = this._getCtx();
+      const now     = ac.currentTime;
+      const samples = Math.floor(ac.sampleRate * duration);
+      const buffer  = ac.createBuffer(1, samples, ac.sampleRate);
+      const data    = buffer.getChannelData(0);
 
-/* ── AUDIO ── */
-let audioCtx = null;
-
-function getAudioCtx() {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
-}
-
-function playTick(volume) {
-  try {
-    const ac      = getAudioCtx();
-    const now     = ac.currentTime;
-    const samples = Math.floor(ac.sampleRate * TICK_DURATION);
-    const buffer  = ac.createBuffer(1, samples, ac.sampleRate);
-    const data    = buffer.getChannelData(0);
-
-    // White noise that decays sharply → click sound
-    for (let i = 0; i < samples; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / samples, 6);
-    }
-
-    const source = ac.createBufferSource();
-    source.buffer = buffer;
-
-    // High-pass filter: remove low rumble, keep crisp click
-    const filter           = ac.createBiquadFilter();
-    filter.type            = 'highpass';
-    filter.frequency.value = TICK_FILTER_FREQ;
-
-    const gain = ac.createGain();
-    gain.gain.setValueAtTime(volume * TICK_GAIN_FACTOR, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + TICK_DURATION);
-
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(ac.destination);
-    source.start(now);
-  } catch (_) { /* audio unavailable */ }
-}
-
-/* ── SPIN ── */
-function spin() {
-  if (state.spinning || state.names.length < 2) return;
-
-  state.spinning = true;
-  state.hasSpun  = true;
-  if (state.idleRaf) { cancelAnimationFrame(state.idleRaf); state.idleRaf = null; }
-  updateCursor();
-
-  const nameCount    = state.names.length;
-  const segmentAngle = (2 * Math.PI) / nameCount;
-  const winnerIdx    = Math.floor(Math.random() * nameCount);
-
-  // Center of winner's segment should land at angle 0 (right = pointer)
-  const winnerCenter = winnerIdx * segmentAngle + segmentAngle / 2;
-  let targetAngle    = -winnerCenter;
-
-  // Forward delta from current angle
-  let delta = (targetAngle - state.angle) % (2 * Math.PI);
-  if (delta < 0) delta += 2 * Math.PI;
-
-  // Add full rotations
-  delta += (SPIN_MIN_ROTATIONS + Math.floor(Math.random() * SPIN_ROTATION_RANGE)) * 2 * Math.PI;
-
-  const startAngle   = state.angle;
-  const duration     = SPIN_MIN_DURATION + Math.random() * SPIN_EXTRA_DURATION;
-  const startTime    = performance.now();
-  let   prevBoundary = Math.floor(startAngle / segmentAngle);
-
-  function frame(t) {
-    const progress = Math.min((t - startTime) / duration, 1);
-    const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-
-    state.angle = startAngle + delta * eased;
-    drawWheel();
-
-    // Play a tick for every segment boundary crossed this frame
-    const currBoundary = Math.floor(state.angle / segmentAngle);
-    const crossings    = Math.min(currBoundary - prevBoundary, TICK_MAX_CROSSINGS);
-    if (crossings > 0) {
-      const volume = Math.max(TICK_VOLUME_MIN, 1 - progress * TICK_VOLUME_FADE);
-      for (let c = 0; c < crossings; c++) {
-        setTimeout(() => playTick(volume), c * TICK_STAGGER_MS);
+      // White noise with sharp exponential decay → click sound
+      for (let i = 0; i < samples; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / samples, 6);
       }
-    }
-    prevBoundary = currBoundary;
 
-    if (progress < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      // Normalise angle to [0, 2π) to prevent float accumulation
-      state.angle      = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
-      state.spinning   = false;
-      state.lastWinner = winnerIdx;
-      updateCursor();
-      setTimeout(() => showWinner(state.names[winnerIdx]), SPIN_WINNER_DELAY);
-      // idle rotation resumes only after the modal is dismissed (see closeModal)
+      const source           = ac.createBufferSource();
+      source.buffer          = buffer;
+
+      const filter           = ac.createBiquadFilter();
+      filter.type            = 'highpass';
+      filter.frequency.value = filterFreq;
+
+      const gain = ac.createGain();
+      gain.gain.setValueAtTime(volume * gainFactor, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      source.connect(filter);
+      filter.connect(gain);
+      gain.connect(ac.destination);
+      source.start(now);
+    } catch (_) { /* audio unavailable */ }
+  }
+}
+
+/* ── WHEEL RENDERER ──────────────────────────────────────────────────────────
+   Responsible solely for drawing to the canvas.
+   Receives all data it needs as arguments — holds no mutable application state.
+────────────────────────────────────────────────────────────────────────────── */
+
+class WheelRenderer {
+  /**
+   * @param {HTMLCanvasElement} canvas
+   * @param {Theme}             theme
+   * @param {object}            config  Full CONFIG object
+   */
+  constructor(canvas, theme, config) {
+    this._canvas = canvas;
+    this._ctx    = canvas.getContext('2d');
+    this._theme  = theme;
+    this._cfg    = config.canvas;
+  }
+
+  /** Resize the backing canvas element to the given square size. */
+  setSize(size) {
+    this._canvas.width  = size;
+    this._canvas.height = size;
+  }
+
+  /**
+   * Full redraw of the wheel for the given state snapshot.
+   * @param {string[]} names  Current participant list
+   * @param {number}   angle  Current rotation in radians
+   */
+  draw(names, angle) {
+    const { width: W, height: H } = this._canvas;
+    const cx = W / 2;
+    const cy = H / 2;
+    const r  = Math.min(cx, cy) - this._cfg.margin;
+    const t  = this._theme.values;
+
+    this._ctx.clearRect(0, 0, W, H);
+
+    if (names.length === 0) { this._drawEmpty(cx, cy, r, t);                   return; }
+    if (names.length === 1) { this._drawSingleSegment(cx, cy, r, names[0], t); return; }
+
+    const segmentAngle = (2 * Math.PI) / names.length;
+    this._drawSegments(cx, cy, r, names, angle, segmentAngle, t);
+    this._drawOuterRing(cx, cy, r, t);
+    this._drawHub(cx, cy, t);
+    this._drawPointer(cx, cy, r, names, angle, t);
+  }
+
+  // ── Private drawing primitives ────────────────────────────────────────────
+
+  /** @private */
+  _drawSegments(cx, cy, r, names, angle, segmentAngle, t) {
+    for (let i = 0; i < names.length; i++) {
+      const startAngle = angle + i * segmentAngle;
+      const endAngle   = startAngle + segmentAngle;
+      const color      = this._theme.colors[i % this._theme.colors.length];
+
+      this._ctx.beginPath();
+      this._ctx.moveTo(cx, cy);
+      this._ctx.arc(cx, cy, r, startAngle, endAngle);
+      this._ctx.closePath();
+      this._ctx.fillStyle   = color;
+      this._ctx.fill();
+      this._ctx.strokeStyle = t.segStroke;
+      this._ctx.lineWidth   = t.segLineWidth;
+      this._ctx.stroke();
+
+      this._drawSegmentLabel(cx, cy, r, startAngle, segmentAngle, names[i], t);
     }
   }
 
-  requestAnimationFrame(frame);
-}
+  /**
+   * Draws a single label rotated to the centre of its segment.
+   * Font size scales with both radius and segment angle so it always fits
+   * regardless of how many names are on the wheel. Truncates with '…' if needed.
+   * @private
+   */
+  _drawSegmentLabel(cx, cy, r, startAngle, segmentAngle, name, t) {
+    this._ctx.save();
+    this._ctx.translate(cx, cy);
+    this._ctx.rotate(startAngle + segmentAngle / 2);
+    this._ctx.textAlign    = t.textAlign;
+    this._ctx.textBaseline = t.textBaseline;
+    this._ctx.shadowColor  = t.textShadow;
+    this._ctx.shadowBlur   = t.textShadowBlur;
 
-/* ── MODAL ── */
-function showWinner(name) {
-  DOM.modalName.textContent = name;
-  DOM.overlay.classList.add('open');
-}
+    const fontSize = Math.max(10, Math.round(Math.min(r * segmentAngle / 7, r * 0.07) * t.nameSize));
+    this._ctx.font      = `${t.textWeight} ${fontSize}px ${t.font}`;
+    this._ctx.fillStyle = t.textColor;
 
-function closeModal() {
-  DOM.overlay.classList.remove('open');
-  startIdleRotation(); // wheel resumes slow rotation once popup is dismissed
-}
+    let label      = name;
+    const maxWidth = r * t.textMaxWidth;
+    while (this._ctx.measureText(label).width > maxWidth && label.length > 2) {
+      label = label.slice(0, -1);
+    }
+    if (label.length < name.length) label += '…';
 
-function removeWinner() {
-  if (state.lastWinner < 0 || state.lastWinner >= state.names.length) { closeModal(); return; }
-  const [name] = state.names.splice(state.lastWinner, 1);
-  state.lastWinner = -1;
-  state.removed.push(name);
-  save();
-  saveRemoved();
-  renderList();
-  renderRemoved();
-  drawWheel();
-  closeModal();
-}
-
-/* ── PAST PARTICIPANTS ── */
-function renderRemoved() {
-  if (state.removed.length === 0) {
-    DOM.pastSection.classList.remove('visible');
-    return;
+    this._ctx.fillText(label, r - t.textOffset, 0);
+    this._ctx.restore();
   }
 
-  DOM.pastSection.classList.add('visible');
-  DOM.pastList.innerHTML = '';
+  /** @private */
+  _drawOuterRing(cx, cy, r, t) {
+    this._ctx.beginPath();
+    this._ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    this._ctx.strokeStyle = t.ringStroke;
+    this._ctx.lineWidth   = t.ringLineWidth;
+    this._ctx.stroke();
+  }
 
-  state.removed.forEach(name => {
-    const frag = DOM.tmplPastItem.cloneNode(true);
-    const span = frag.querySelector('.past-name');
-    span.textContent = name;  // textContent auto-escapes — no manual escaping needed
-    span.title       = name;
-    DOM.pastList.appendChild(frag);
-  });
+  /**
+   * Draws the triangular pointer on the right side of the wheel.
+   * The tip overlaps into the wheel; colour matches the segment currently
+   * under the pointer for immediate visual feedback during the spin.
+   * @private
+   */
+  _drawPointer(cx, cy, r, names, angle, t) {
+    let color = t.gold;
+    if (names.length >= 1) {
+      const segmentAngle    = (2 * Math.PI) / names.length;
+      const normalizedAngle = ((-angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+      const segmentIndex    = Math.floor(normalizedAngle / segmentAngle) % names.length;
+      color = this._theme.colors[segmentIndex % this._theme.colors.length];
+    }
+
+    this._ctx.save();
+    this._ctx.translate(cx, cy);
+    this._ctx.shadowColor   = t.ptrShadow;
+    this._ctx.shadowBlur    = t.ptrShadowBlur;
+    this._ctx.shadowOffsetX = t.ptrShadowX;
+
+    this._ctx.beginPath();
+    this._ctx.moveTo(r - t.ptrOverlap,  0);             // tip — inside the wheel
+    this._ctx.lineTo(r + t.ptrReach,   -t.ptrHeight);   // top-right base
+    this._ctx.lineTo(r + t.ptrReach,    t.ptrHeight);   // bottom-right base
+    this._ctx.closePath();
+
+    this._ctx.fillStyle = color;
+    this._ctx.fill();
+
+    this._ctx.shadowBlur    = 0;
+    this._ctx.shadowOffsetX = 0;
+    this._ctx.strokeStyle   = t.ptrStroke;
+    this._ctx.lineWidth     = t.ptrLineWidth;
+    this._ctx.stroke();
+
+    this._ctx.restore();
+  }
+
+  /** @private */
+  _drawEmpty(cx, cy, r, t) {
+    this._ctx.beginPath();
+    this._ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    this._ctx.fillStyle   = t.emptyFill;
+    this._ctx.fill();
+    this._ctx.strokeStyle = t.emptyStroke;
+    this._ctx.lineWidth   = t.emptyLineWidth;
+    this._ctx.stroke();
+
+    // "Add names to get started" is an HTML overlay — see #emptyHint in index.html
+    this._drawPointer(cx, cy, r, [], 0, t);
+  }
+
+  /** @private */
+  _drawSingleSegment(cx, cy, r, name, t) {
+    this._ctx.beginPath();
+    this._ctx.arc(cx, cy, r, 0, 2 * Math.PI);
+    this._ctx.fillStyle   = this._theme.colors[0];
+    this._ctx.fill();
+    this._ctx.strokeStyle = t.ringStroke;
+    this._ctx.lineWidth   = t.ringLineWidth;
+    this._ctx.stroke();
+
+    this._ctx.save();
+    this._ctx.shadowColor  = t.textShadow;
+    this._ctx.shadowBlur   = t.textShadowBlur;
+    this._ctx.fillStyle    = t.textColor;
+    this._ctx.font         = `${t.textWeight} ${t.singleSize}px ${t.font}`;
+    this._ctx.textAlign    = t.textAlignCenter;
+    this._ctx.textBaseline = t.textBaseline;
+    this._ctx.fillText(name, cx, cy);
+    this._ctx.restore();
+
+    this._drawHub(cx, cy, t);
+    this._drawPointer(cx, cy, r, [name], 0, t);
+  }
+
+  /** @private */
+  _drawHub(cx, cy, t) {
+    const layers = [
+      [t.hubR1, t.hubOuter],
+      [t.hubR2, t.hubMid],
+      [t.hubR3, t.hubInner],
+    ];
+    layers.forEach(([radius, fill]) => {
+      this._ctx.beginPath();
+      this._ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+      this._ctx.fillStyle = fill;
+      this._ctx.fill();
+    });
+  }
 }
 
-function clearPast() {
-  state.removed = [];
-  saveRemoved();
-  renderRemoved();
+/* ── WHEEL APP ───────────────────────────────────────────────────────────────
+   Orchestrates state, persistence, events, and rendering.
+   The only class that mutates application state.
+────────────────────────────────────────────────────────────────────────────── */
+
+class WheelApp {
+  /**
+   * @param {object}        deps
+   * @param {object}        deps.dom       Pre-resolved DOM reference map
+   * @param {WheelRenderer} deps.renderer
+   * @param {AudioManager}  deps.audio
+   * @param {Theme}         deps.theme
+   * @param {object}        deps.config    Full CONFIG object
+   */
+  constructor({ dom, renderer, audio, theme, config }) {
+    this._dom      = dom;
+    this._renderer = renderer;
+    this._audio    = audio;
+    this._theme    = theme;
+    this._cfg      = config;
+
+    // ── Application state ──────────────────────────────────────────────────
+    this._names      = [];
+    this._removed    = [];
+    this._angle      = 0;
+    this._spinning   = false;
+    this._lastWinner = -1;
+    this._idleRaf    = null;
+    this._hasSpun    = false;
+  }
+
+  /** Bootstrap: load persisted data, bind events, start resize observation. */
+  init() {
+    this._theme.load();
+    this._loadFromStorage();
+    this._bindEvents();
+    this._setupResizeObserver();
+    this._renderList();
+    this._renderRemoved();
+    this._startIdleRotation();
+  }
+
+  // ── Persistence ───────────────────────────────────────────────────────────
+
+  _loadFromStorage() {
+    const load = key => {
+      try {
+        const raw = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(raw)
+          ? raw.filter(item => typeof item === 'string' && item.trim().length > 0)
+          : [];
+      } catch (err) {
+        console.warn(`Failed to load "${key}" from localStorage`, err);
+        return [];
+      }
+    };
+
+    this._names   = load(this._cfg.storage.names);
+    this._removed = load(this._cfg.storage.removed);
+  }
+
+  _save()        { localStorage.setItem(this._cfg.storage.names,   JSON.stringify(this._names)); }
+  _saveRemoved() { localStorage.setItem(this._cfg.storage.removed, JSON.stringify(this._removed)); }
+
+  // ── Events ────────────────────────────────────────────────────────────────
+
+  _bindEvents() {
+    const d = this._dom;
+    d.nameInput   .addEventListener('keydown', e => { if (e.key === 'Enter') this._addName(); });
+    d.btnAdd      .addEventListener('click',   () => this._addName());
+    d.bulkToggle  .addEventListener('click',   () => this._toggleBulk());
+    d.btnBulkAdd  .addEventListener('click',   () => this._addBulk());
+    d.btnBulkClear.addEventListener('click',   () => this._clearBulk());
+    d.btnClearPast.addEventListener('click',   () => this._clearPast());
+    d.overlay     .addEventListener('click',   e  => { if (e.target === d.overlay) this._closeModal(); });
+    d.btnClose    .addEventListener('click',   () => this._closeModal());
+    d.btnRemove   .addEventListener('click',   () => this._removeWinner());
+    d.canvas      .addEventListener('click',   () => this._spin());
+  }
+
+  // ── Layout ────────────────────────────────────────────────────────────────
+
+  /**
+   * Observes the `.main` container with ResizeObserver instead of listening
+   * to `window.resize`. The observer fires whenever the content area changes,
+   * including when CSS switches between desktop (panel fixed) and mobile
+   * (panel stacked) layouts — no hardcoded breakpoint needed in JavaScript.
+   */
+  _setupResizeObserver() {
+    const ro = new ResizeObserver(() => this._resize());
+    ro.observe(this._dom.main);
+    this._resize(); // size synchronously before first paint
+  }
+
+  /**
+   * Computes and applies the correct canvas size for the current viewport.
+   *
+   * Desktop vs mobile layout is determined by reading the computed `position`
+   * of the names panel directly from CSS. The breakpoint lives in style.css;
+   * JavaScript simply reacts to whatever CSS has decided.
+   * - `position: fixed`  → panel floats outside the flow → subtract its width
+   * - `position: static` → panel stacks in the flow     → no subtraction needed
+   */
+  _resize() {
+    this._theme.load(); // reload CSS vars — media queries may have changed them
+    const { canvas: c } = this._cfg;
+
+    const panelIsFixed = getComputedStyle(this._dom.namesPanel).position === 'fixed';
+    const headerH      = this._dom.header?.offsetHeight ?? 80;
+    const panelW       = panelIsFixed ? c.panelWidth   : 0;
+    const hPad         = panelIsFixed ? c.hPadDesktop  : c.hPadMobile;
+
+    const maxH = window.innerHeight - headerH - c.vPad;
+    const maxW = window.innerWidth  - panelW  - hPad;
+    const size = Math.max(c.minSize, Math.min(maxH, maxW, c.maxSize));
+
+    this._renderer.setSize(size);
+    this._renderer.draw(this._names, this._angle);
+  }
+
+  // ── Data mutations ────────────────────────────────────────────────────────
+
+  _addName() {
+    const value = this._dom.nameInput.value.trim();
+    if (!value) { this._dom.nameInput.focus(); return; }
+    this._names.push(value);
+    this._dom.nameInput.value = '';
+    this._dom.nameInput.focus();
+    this._save();
+    this._renderList();
+    this._renderer.draw(this._names, this._angle);
+  }
+
+  _removeName(i) {
+    this._names.splice(i, 1);
+    this._save();
+    this._renderList();
+    this._renderer.draw(this._names, this._angle);
+  }
+
+  // ── Bulk add ──────────────────────────────────────────────────────────────
+
+  _toggleBulk() {
+    const isOpen = this._dom.bulkArea.classList.toggle('open');
+    this._dom.bulkToggle.classList.toggle('open', isOpen);
+    if (isOpen) this._dom.bulkInput.focus();
+  }
+
+  _addBulk() {
+    const added = this._dom.bulkInput.value
+      .split('\n')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && s.length <= 25);
+
+    if (added.length === 0) return;
+
+    this._names.push(...added);
+    this._save();
+    this._renderList();
+    this._renderer.draw(this._names, this._angle);
+
+    this._dom.bulkInput.value = '';
+    this._dom.bulkArea  .classList.remove('open');
+    this._dom.bulkToggle.classList.remove('open');
+  }
+
+  _clearBulk() {
+    this._dom.bulkInput.value = '';
+    this._dom.bulkInput.focus();
+  }
+
+  // ── UI rendering ──────────────────────────────────────────────────────────
+
+  _renderList() {
+    const d = this._dom;
+    d.namesList.innerHTML = '';
+
+    this._names.forEach((name, i) => {
+      const color  = this._theme.colors[i % this._theme.colors.length];
+      const frag   = d.tmplNameItem.cloneNode(true);
+      const li     = frag.querySelector('li');
+      const label  = frag.querySelector('.name-label');
+      const btnDel = frag.querySelector('.btn-del');
+
+      li.style.setProperty('--item-color', color);
+      label.textContent = name;  // textContent auto-escapes — no manual escaping needed
+      label.title       = name;
+      btnDel.addEventListener('click', () => this._removeName(i));
+
+      d.namesList.appendChild(frag);
+    });
+
+    // Status message copy is sourced from data-attributes on the element —
+    // the strings live in HTML, not hardcoded in JavaScript.
+    const count = this._names.length;
+    const el    = d.statusMsg;
+    el.textContent = count === 0 ? el.dataset.msgEmpty
+                   : count === 1 ? el.dataset.msgOne
+                   : `${count} ${el.dataset.msgMany}`;
+    el.classList.toggle('warn', count < 2);
+
+    this._updateWheelState();
+  }
+
+  _renderRemoved() {
+    const d = this._dom;
+
+    if (this._removed.length === 0) {
+      d.pastSection.classList.remove('visible');
+      return;
+    }
+
+    d.pastSection.classList.add('visible');
+    d.pastList.innerHTML = '';
+
+    this._removed.forEach(name => {
+      const frag = d.tmplPastItem.cloneNode(true);
+      const span = frag.querySelector('.past-name');
+      span.textContent = name;  // textContent auto-escapes — safe
+      span.title       = name;
+      d.pastList.appendChild(frag);
+    });
+  }
+
+  /**
+   * Reflects the current interaction state onto `data-wheel-state` on the
+   * wheel wrapper, letting CSS drive cursor styling via attribute selectors
+   * with no manual cursor-class juggling in JavaScript.
+   *
+   * States:
+   *   spinning → wheel is animating, clicks ignored
+   *   empty    → fewer than 2 names, cannot spin
+   *   ready    → can spin (default pointer cursor)
+   *
+   * Also shows/hides the two canvas overlay hints.
+   */
+  _updateWheelState() {
+    this._dom.wheelWrapper.dataset.wheelState =
+      this._spinning         ? 'spinning'
+      : this._names.length < 2 ? 'empty'
+      : 'ready';
+
+    this._dom.spinHint .classList.toggle('hidden', this._hasSpun || this._spinning || this._names.length < 2);
+    this._dom.emptyHint.classList.toggle('hidden', this._names.length !== 0);
+  }
+
+  // ── Idle rotation ─────────────────────────────────────────────────────────
+
+  _startIdleRotation() {
+    if (this._idleRaf) return; // already running
+    let lastTime = null;
+
+    const idleFrame = t => {
+      if (this._spinning) { this._idleRaf = null; return; } // spin takes over
+      if (lastTime !== null) {
+        this._angle = (this._angle + this._cfg.idle.speed * (t - lastTime)) % (2 * Math.PI);
+        this._renderer.draw(this._names, this._angle);
+      }
+      lastTime      = t;
+      this._idleRaf = requestAnimationFrame(idleFrame);
+    };
+
+    this._idleRaf = requestAnimationFrame(idleFrame);
+  }
+
+  // ── Spin ──────────────────────────────────────────────────────────────────
+
+  /**
+   * Starts the spin animation towards a randomly chosen winner.
+   *
+   * Target angle is computed so the winner segment's centre lands exactly at
+   * angle 0 (where the pointer sits on the right side of the wheel).
+   * Animation uses an ease-out cubic curve; AudioManager tick sounds fire for
+   * each segment boundary the pointer crosses during the animation.
+   */
+  _spin() {
+    if (this._spinning || this._names.length < 2) return;
+
+    this._spinning = true;
+    this._hasSpun  = true;
+    if (this._idleRaf) { cancelAnimationFrame(this._idleRaf); this._idleRaf = null; }
+    this._updateWheelState();
+
+    const { minRotations, rotationRange, minDuration, extraDuration, winnerDelay } = this._cfg.spin;
+    const { maxCrossings, staggerMs, volumeMin, volumeFade } = this._cfg.tick;
+
+    const nameCount    = this._names.length;
+    const segmentAngle = (2 * Math.PI) / nameCount;
+    const winnerIdx    = Math.floor(Math.random() * nameCount);
+
+    // Forward delta: the shortest forward rotation that lands the winner at the pointer
+    const winnerCenter = winnerIdx * segmentAngle + segmentAngle / 2;
+    let   delta        = ((-winnerCenter - this._angle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+
+    // Pad with minimum full rotations so the spin always feels substantial
+    delta += (minRotations + Math.floor(Math.random() * rotationRange)) * 2 * Math.PI;
+
+    const startAngle   = this._angle;
+    const duration     = minDuration + Math.random() * extraDuration;
+    const startTime    = performance.now();
+    let   prevBoundary = Math.floor(startAngle / segmentAngle);
+
+    const frame = t => {
+      const progress = Math.min((t - startTime) / duration, 1);
+      const eased    = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+
+      this._angle = startAngle + delta * eased;
+      this._renderer.draw(this._names, this._angle);
+
+      // Fire a tick for every segment boundary crossed this frame
+      const currBoundary = Math.floor(this._angle / segmentAngle);
+      const crossings    = Math.min(currBoundary - prevBoundary, maxCrossings);
+      if (crossings > 0) {
+        const volume = Math.max(volumeMin, 1 - progress * volumeFade);
+        for (let c = 0; c < crossings; c++) {
+          setTimeout(() => this._audio.playTick(volume), c * staggerMs);
+        }
+      }
+      prevBoundary = currBoundary;
+
+      if (progress < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        // Normalise to [0, 2π) to prevent floating-point drift over many spins
+        this._angle      = ((startAngle + delta) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        this._spinning   = false;
+        this._lastWinner = winnerIdx;
+        this._updateWheelState();
+        setTimeout(() => this._showWinner(this._names[winnerIdx]), winnerDelay);
+        // Idle rotation resumes only after the modal is dismissed — see _closeModal()
+      }
+    };
+
+    requestAnimationFrame(frame);
+  }
+
+  // ── Modal ─────────────────────────────────────────────────────────────────
+
+  _showWinner(name) {
+    this._dom.modalName.textContent = name;
+    this._dom.overlay.classList.add('open');
+  }
+
+  _closeModal() {
+    this._dom.overlay.classList.remove('open');
+    this._startIdleRotation(); // wheel resumes slow rotation once popup is dismissed
+  }
+
+  _removeWinner() {
+    if (this._lastWinner < 0 || this._lastWinner >= this._names.length) {
+      this._closeModal();
+      return;
+    }
+    const [name]     = this._names.splice(this._lastWinner, 1);
+    this._lastWinner = -1;
+    this._removed.push(name);
+    this._save();
+    this._saveRemoved();
+    this._renderList();
+    this._renderRemoved();
+    this._renderer.draw(this._names, this._angle);
+    this._closeModal();
+  }
+
+  // ── Past participants ─────────────────────────────────────────────────────
+
+  _clearPast() {
+    this._removed = [];
+    this._saveRemoved();
+    this._renderRemoved();
+  }
 }
 
-function overlayClick(e) {
-  if (e.target === DOM.overlay) closeModal();
-}
+/* ── BOOTSTRAP ───────────────────────────────────────────────────────────────
+   Resolve all DOM references once, assemble dependencies, start the app.
+────────────────────────────────────────────────────────────────────────────── */
 
-/* ── UTILS ── */
-function debounce(fn, ms) {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn(...args), ms);
+(function bootstrap() {
+  const dom = {
+    canvas:       document.getElementById('wheel'),
+    nameInput:    document.getElementById('nameInput'),
+    namesList:    document.getElementById('namesList'),
+    statusMsg:    document.getElementById('statusMsg'),
+    bulkToggle:   document.getElementById('bulkToggle'),
+    bulkArea:     document.getElementById('bulkArea'),
+    bulkInput:    document.getElementById('bulkInput'),
+    spinHint:     document.getElementById('spinHint'),
+    emptyHint:    document.getElementById('emptyHint'),
+    overlay:      document.getElementById('overlay'),
+    modalName:    document.getElementById('modalName'),
+    pastSection:  document.getElementById('pastSection'),
+    pastList:     document.getElementById('pastList'),
+    main:         document.querySelector('.main'),
+    header:       document.querySelector('header'),
+    wheelWrapper: document.querySelector('.wheel-wrapper'),
+    namesPanel:   document.querySelector('.names-panel'),
+    btnAdd:       document.querySelector('.btn-add'),
+    btnBulkAdd:   document.querySelector('.btn-bulk-add'),
+    btnBulkClear: document.querySelector('.btn-bulk-clear'),
+    btnClearPast: document.querySelector('.btn-clear-past'),
+    btnClose:     document.querySelector('.btn-close'),
+    btnRemove:    document.querySelector('.btn-remove'),
+    tmplNameItem: document.getElementById('tmpl-name-item').content,
+    tmplPastItem: document.getElementById('tmpl-past-item').content,
   };
-}
+
+  const theme    = new Theme();
+  const renderer = new WheelRenderer(dom.canvas, theme, CONFIG);
+  const audio    = new AudioManager(CONFIG);
+  const app      = new WheelApp({ dom, renderer, audio, theme, config: CONFIG });
+
+  app.init();
+})();
