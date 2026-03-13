@@ -488,11 +488,10 @@ class WheelApp {
 
     const panelIsFixed = getComputedStyle(this._dom.namesPanel).position === 'fixed';
     const headerH      = this._dom.header?.offsetHeight ?? 80;
-    const panelW       = panelIsFixed ? c.panelWidth   : 0;
     const hPad         = panelIsFixed ? c.hPadDesktop  : c.hPadMobile;
 
     const maxH = window.innerHeight - headerH - c.vPad;
-    const maxW = window.innerWidth  - panelW  - hPad;
+    const maxW = window.innerWidth  - hPad;
     const size = Math.max(c.minSize, Math.min(maxH, maxW, c.maxSize));
 
     this._renderer.setSize(size);

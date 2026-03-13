@@ -89,6 +89,9 @@ body {
   min-height: 100vh;
   color: var(--y2k-black);
   padding-bottom: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   /* subtle star-dot pattern */
   background-image:
     radial-gradient(circle, rgba(255,59,167,0.18) 1.5px, transparent 1.5px),
@@ -129,7 +132,8 @@ header p {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 20px var(--names-panel-offset) 20px 20px;
+  width: 100%;
+  padding: 20px;
 }
 
 /* ── WHEEL ── */
