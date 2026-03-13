@@ -9,6 +9,7 @@ const CONFIG = {
   storage: {
     names:   'wof_names_v1',
     removed: 'wof_removed_v1',
+    winners: 'wof_winners_v1',
   },
   canvas: {
     margin:      48,   // px — gap between wheel rim and canvas edge (room for pointer)
@@ -298,6 +299,7 @@ class WheelRenderer {
       const segmentIndex    = Math.floor(normalizedAngle / segmentAngle) % names.length;
       color = this._theme.colors[segmentIndex % this._theme.colors.length];
     }
+    this.pointerColor = color;
 
     this._ctx.save();
     this._ctx.translate(cx, cy);
@@ -403,6 +405,7 @@ class WheelApp {
     // ── Application state ──────────────────────────────────────────────────
     this._names      = [];
     this._removed    = [];
+    this._winners    = [];
     this._angle      = 0;
     this._spinning   = false;
     this._lastWinner = -1;
@@ -424,7 +427,7 @@ class WheelApp {
   // ── Persistence ───────────────────────────────────────────────────────────
 
   _loadFromStorage() {
-    const load = key => {
+    const loadStrings = key => {
       try {
         const raw = JSON.parse(localStorage.getItem(key) || '[]');
         return Array.isArray(raw)
@@ -436,12 +439,26 @@ class WheelApp {
       }
     };
 
-    this._names   = load(this._cfg.storage.names);
-    this._removed = load(this._cfg.storage.removed);
+    const loadWinners = key => {
+      try {
+        const raw = JSON.parse(localStorage.getItem(key) || '[]');
+        return Array.isArray(raw)
+          ? raw.filter(item => item && typeof item === 'object' && typeof item.name === 'string')
+          : [];
+      } catch (err) {
+        console.warn(`Failed to load "${key}" from localStorage`, err);
+        return [];
+      }
+    };
+
+    this._names    = loadStrings(this._cfg.storage.names);
+    this._removed  = loadStrings(this._cfg.storage.removed);
+    this._winners  = loadWinners(this._cfg.storage.winners);
   }
 
-  _save()        { localStorage.setItem(this._cfg.storage.names,   JSON.stringify(this._names)); }
-  _saveRemoved() { localStorage.setItem(this._cfg.storage.removed, JSON.stringify(this._removed)); }
+  _save()         { localStorage.setItem(this._cfg.storage.names,    JSON.stringify(this._names)); }
+  _saveRemoved()  { localStorage.setItem(this._cfg.storage.removed,  JSON.stringify(this._removed)); }
+  _saveWinners()  { localStorage.setItem(this._cfg.storage.winners,  JSON.stringify(this._winners)); }
 
   // ── Events ────────────────────────────────────────────────────────────────
 
@@ -454,8 +471,8 @@ class WheelApp {
     d.btnBulkClear.addEventListener('click',   () => this._clearBulk());
     d.btnClearPast.addEventListener('click',   () => this._clearPast());
     d.overlay     .addEventListener('click',   e  => { if (e.target === d.overlay) this._closeModal(); });
-    d.btnClose    .addEventListener('click',   () => this._closeModal());
-    d.btnRemove   .addEventListener('click',   () => this._removeWinner());
+    d.btnClose    .addEventListener('click',   () => this._removeWinner());
+    d.btnRemove   .addEventListener('click',   () => this._closeModal());
     d.canvas      .addEventListener('click',   () => this._spin());
   }
 
@@ -588,7 +605,7 @@ class WheelApp {
   _renderRemoved() {
     const d = this._dom;
 
-    if (this._removed.length === 0) {
+    if (this._winners.length === 0) {
       d.pastSection.classList.remove('visible');
       return;
     }
@@ -596,9 +613,12 @@ class WheelApp {
     d.pastSection.classList.add('visible');
     d.pastList.innerHTML = '';
 
-    this._removed.forEach(name => {
+    this._winners.forEach(winner => {
+      const { name, color } = typeof winner === 'object' ? winner : { name: winner, color: null };
       const frag = d.tmplPastItem.cloneNode(true);
+      const li   = frag.querySelector('li');
       const span = frag.querySelector('.past-name');
+      if (color) li.style.setProperty('--item-color', color);
       span.textContent = name;  // textContent auto-escapes — safe
       span.title       = name;
       d.pastList.appendChild(frag);
@@ -617,6 +637,11 @@ class WheelApp {
    *
    * Also shows/hides the two canvas overlay hints.
    */
+  _syncSpinHint() {
+    const color = this._renderer.pointerColor;
+    if (color) this._dom.spinHint.style.background = color;
+  }
+
   _updateWheelState() {
     this._dom.wheelWrapper.dataset.wheelState =
       this._spinning         ? 'spinning'
@@ -638,6 +663,7 @@ class WheelApp {
       if (lastTime !== null) {
         this._angle = (this._angle + this._cfg.idle.speed * (t - lastTime)) % (2 * Math.PI);
         this._renderer.draw(this._names, this._angle);
+        this._syncSpinHint();
       }
       lastTime      = t;
       this._idleRaf = requestAnimationFrame(idleFrame);
@@ -689,6 +715,7 @@ class WheelApp {
 
       this._angle = startAngle + delta * eased;
       this._renderer.draw(this._names, this._angle);
+      this._syncSpinHint();
 
       // Fire a tick for every segment boundary crossed this frame
       const currBoundary = Math.floor(this._angle / segmentAngle);
@@ -709,7 +736,8 @@ class WheelApp {
         this._spinning   = false;
         this._lastWinner = winnerIdx;
         this._updateWheelState();
-        setTimeout(() => this._showWinner(this._names[winnerIdx]), winnerDelay);
+        const winnerColor = this._theme.colors[winnerIdx % this._theme.colors.length];
+        setTimeout(() => this._showWinner(this._names[winnerIdx], winnerColor), winnerDelay);
         // Idle rotation resumes only after the modal is dismissed — see _closeModal()
       }
     };
@@ -719,8 +747,13 @@ class WheelApp {
 
   // ── Modal ─────────────────────────────────────────────────────────────────
 
-  _showWinner(name) {
-    this._dom.modalName.textContent = name;
+  _showWinner(name, color) {
+    this._winners.push({ name, color });
+    this._saveWinners();
+    this._renderRemoved();
+    this._dom.modalName.textContent        = name;
+    this._dom.modalName.style.color        = color || '';
+    this._dom.btnClose.style.background    = color || '';
     this._dom.overlay.classList.add('open');
   }
 
@@ -748,8 +781,8 @@ class WheelApp {
   // ── Past candidates ─────────────────────────────────────────────────────
 
   _clearPast() {
-    this._removed = [];
-    this._saveRemoved();
+    this._winners = [];
+    this._saveWinners();
     this._renderRemoved();
   }
 }

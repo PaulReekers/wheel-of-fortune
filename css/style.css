@@ -29,7 +29,7 @@
   --wof-text-baseline:       middle;
   --wof-text-offset:         12;
   --wof-text-max-width:      0.72;
-  --wof-name-size:           3;
+  --wof-name-size:           2;
 
   /* Canvas — single segment label */
   --wof-single-size:         18;
@@ -130,13 +130,13 @@ header {
 header h1 {
   font-family: "Fredoka", sans-serif;
   font-size: clamp(2rem, 6vw, 3.4rem);
-  color: var(--y2k-black);
+  color: var(--y2k-pink);
   letter-spacing: 2px;
   font-weight: 700;
   text-transform: uppercase;
   /* thick chunky shadow — Starface / Y2K style */
   text-shadow:
-    3px 3px 0 var(--y2k-pink),
+    3px 3px 0 var(--y2k-black),
     6px 6px 0 rgba(0,0,0,0.15);
   display: inline-block;
 }
@@ -674,7 +674,7 @@ header p {
   border-radius: 8px;
   background: rgba(255,255,255,0.5);
   border: 1.5px solid rgba(0,0,0,0.15);
-  border-left: 3px solid var(--y2k-pink);
+  border-left: 3px solid var(--item-color, var(--y2k-pink));
   counter-increment: past-counter;
 }
 
@@ -682,7 +682,7 @@ header p {
   content: counter(past-counter);
   font-size: 0.7rem;
   font-weight: 900;
-  color: var(--y2k-pink);
+  color: var(--item-color, var(--y2k-pink));
   min-width: 14px;
   text-align: right;
 }
