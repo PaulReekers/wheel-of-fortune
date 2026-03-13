@@ -745,7 +745,7 @@ class WheelApp {
     this._closeModal();
   }
 
-  // ── Past participants ─────────────────────────────────────────────────────
+  // ── Past candidates ─────────────────────────────────────────────────────
 
   _clearPast() {
     this._removed = [];

@@ -13,10 +13,10 @@
   <meta name="apple-mobile-web-app-title" content="Fortune" />
   <link rel="manifest" href="site.webmanifest" />
 
-  <!-- Google Font: Nunito -->
+  <!-- Google Fonts: Nunito + Fredoka -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="css/style.css" />
@@ -25,7 +25,7 @@
 
 <header>
   <h1>Wheel of Fortune</h1>
-  <p>Add participants and spin the wheel!</p>
+  <p>Add names and spin the wheel!</p>
 </header>
 
 <div class="main">
@@ -41,7 +41,7 @@
 
   <!-- Names panel -->
   <div class="names-panel">
-    <h2>Participants</h2>
+    <h2>Candidates</h2>
 
     <div class="input-row">
       <input type="text" id="nameInput" placeholder="Enter name..." maxlength="25" autocomplete="off">
@@ -61,13 +61,13 @@
     <ul class="names-list" id="namesList"></ul>
     <p class="status-msg" id="statusMsg"
        data-msg-empty="Add at least 2 names."
-       data-msg-one="1 participant — add at least 1 more."
-       data-msg-many="participants"></p>
+       data-msg-one="1 candidate — add at least 1 more."
+       data-msg-many="candidates"></p>
 
-    <!-- Past participants -->
+    <!-- Past candidates -->
     <div class="past-section" id="pastSection">
       <div class="past-header">
-        <span class="past-title">✓ Past participants</span>
+        <span class="past-title">Past candidates</span>
         <button class="btn-clear-past">Clear</button>
       </div>
       <ol class="past-list" id="pastList"></ol>
