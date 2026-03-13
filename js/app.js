@@ -11,7 +11,7 @@ const CONFIG = {
     removed: 'wof_removed_v1',
   },
   canvas: {
-    margin:      30,   // px — gap between wheel rim and canvas edge (room for pointer)
+    margin:      48,   // px — gap between wheel rim and canvas edge (room for pointer)
     minSize:     240,  // px — smallest the canvas will shrink to
     maxSize:     900,  // px — largest the canvas will grow to
     panelWidth:  340,  // px — desktop panel width + its margins
@@ -101,6 +101,7 @@ class Theme {
       ptrShadow:       v('--wof-pointer-shadow'),
       ptrShadowBlur:   n('--wof-pointer-shadow-blur'),
       ptrShadowX:      n('--wof-pointer-shadow-x'),
+      ptrShadowY:      n('--wof-pointer-shadow-y'),
       ptrLineWidth:    n('--wof-pointer-line-width'),
       ptrOverlap:      n('--wof-pointer-overlap'),
       ptrReach:        n('--wof-pointer-reach'),
@@ -303,6 +304,7 @@ class WheelRenderer {
     this._ctx.shadowColor   = t.ptrShadow;
     this._ctx.shadowBlur    = t.ptrShadowBlur;
     this._ctx.shadowOffsetX = t.ptrShadowX;
+    this._ctx.shadowOffsetY = t.ptrShadowY;
 
     this._ctx.beginPath();
     this._ctx.moveTo(r - t.ptrOverlap,  0);             // tip — inside the wheel
@@ -315,6 +317,7 @@ class WheelRenderer {
 
     this._ctx.shadowBlur    = 0;
     this._ctx.shadowOffsetX = 0;
+    this._ctx.shadowOffsetY = 0;
     this._ctx.strokeStyle   = t.ptrStroke;
     this._ctx.lineWidth     = t.ptrLineWidth;
     this._ctx.stroke();
@@ -465,7 +468,7 @@ class WheelApp {
    * (panel stacked) layouts — no hardcoded breakpoint needed in JavaScript.
    */
   _setupResizeObserver() {
-    const ro = new ResizeObserver(() => this._resize());
+    const ro = new ResizeObserver(() => requestAnimationFrame(() => this._resize()));
     ro.observe(this._dom.main);
     this._resize(); // size synchronously before first paint
   }
