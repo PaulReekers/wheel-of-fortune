@@ -639,7 +639,10 @@ class WheelApp {
    */
   _syncSpinHint() {
     const color = this._renderer.pointerColor;
-    if (color) this._dom.spinHint.style.background = color;
+    if (color) {
+      this._dom.spinHint.style.background = color;
+      this._dom.headerH1.style.color = color;
+    }
   }
 
   _updateWheelState() {
@@ -801,6 +804,7 @@ class WheelApp {
     bulkArea:     document.getElementById('bulkArea'),
     bulkInput:    document.getElementById('bulkInput'),
     spinHint:     document.getElementById('spinHint'),
+    headerH1:     document.querySelector('header h1'),
     emptyHint:    document.getElementById('emptyHint'),
     overlay:      document.getElementById('overlay'),
     modalName:    document.getElementById('modalName'),
