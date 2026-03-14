@@ -37,7 +37,7 @@ const CONFIG = {
     staggerMs:    12,     // ms between staggered ticks in one frame
   },
   idle: {
-    speed: 0.00018, // rad/ms ≈ one full rotation every ~35 s
+    speed: 0.00008, // rad/ms ≈ one full rotation every ~35 s
   },
 };
 

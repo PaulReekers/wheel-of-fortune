@@ -139,6 +139,7 @@ header h1 {
     3px 3px 0 var(--y2k-black),
     6px 6px 0 rgba(0,0,0,0.15);
   display: inline-block;
+  transition: color 0.6s ease;
 }
 
 #wheel-word {
@@ -190,7 +191,7 @@ header p {
   box-shadow: 5px 5px 0 var(--y2k-black);
   pointer-events: none;
   white-space: nowrap;
-  transition: opacity 0.25s;
+  transition: opacity 0.25s, background 0.6s ease;
   text-transform: uppercase;
   letter-spacing: 1px;
 }
