@@ -24,7 +24,7 @@
 <body>
 
 <header>
-  <h1>Wheel of Terror</h1>
+  <h1>Wheel of <span id="wheel-word">Terror</span></h1>
   <p>Add names and spin the wheel!</p>
 </header>
 
@@ -106,8 +106,107 @@
   </li>
 </template>
 
+<!-- GSAP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
 <!-- JavaScript -->
 <script src="js/app.js"></script>
+
+<!-- Word transition animation -->
+<script>
+  (function () {
+    const words   = ['Terror', 'Doom', 'Fortune', 'Fun', 'Names'];
+    let   current = 0;
+    const wordEl  = document.getElementById('wheel-word');
+
+    // Only the word span animates — "Wheel of" stays put
+    gsap.set(wordEl, { transformPerspective: 600 });
+
+    // Each animation: exit wordEl → swap text → enter wordEl
+    const animations = [
+      // Flip X — departure board
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { rotationX: 90, opacity: 0, duration: 0.28, ease: 'power2.in', transformOrigin: '50% 100%' })
+          .call(swap)
+          .fromTo(wordEl, { rotationX: -90, opacity: 0, transformOrigin: '50% 0%' },
+                          { rotationX: 0,   opacity: 1, duration: 0.4, ease: 'back.out(1.5)' });
+      },
+      // Flip Y — side door
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { rotationY: 90, opacity: 0, duration: 0.28, ease: 'power2.in', transformOrigin: '100% 50%' })
+          .call(swap)
+          .fromTo(wordEl, { rotationY: -90, opacity: 0, transformOrigin: '0% 50%' },
+                          { rotationY: 0,   opacity: 1, duration: 0.4, ease: 'back.out(1.5)' });
+      },
+      // Zoom collapse + elastic pop
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { scale: 0, opacity: 0, duration: 0.3, ease: 'back.in(2)' })
+          .call(swap)
+          .fromTo(wordEl, { scale: 0, opacity: 0 },
+                          { scale: 1, opacity: 1, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
+      },
+      // Slide up
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { y: -40, opacity: 0, duration: 0.28, ease: 'power2.in' })
+          .call(swap)
+          .fromTo(wordEl, { y: 40, opacity: 0 },
+                          { y: 0,  opacity: 1, duration: 0.4, ease: 'back.out(1.5)' });
+      },
+      // Slide left
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { x: -60, opacity: 0, duration: 0.28, ease: 'power2.in' })
+          .call(swap)
+          .fromTo(wordEl, { x: 60, opacity: 0 },
+                          { x: 0,  opacity: 1, duration: 0.4, ease: 'back.out(1.2)' });
+      },
+      // Shake + fade
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { x: 10, duration: 0.05, ease: 'none', repeat: 5, yoyo: true })
+          .to(wordEl, { x: 0, opacity: 0, duration: 0.12 }, '<0.2')
+          .call(swap)
+          .fromTo(wordEl, { opacity: 0, scale: 1.2 },
+                          { opacity: 1, scale: 1,  duration: 0.4, ease: 'back.out(2)' });
+      },
+      // Full spin
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { rotation: 180, opacity: 0, scale: 0.3, duration: 0.35, ease: 'power2.in' })
+          .call(swap)
+          .fromTo(wordEl, { rotation: -180, opacity: 0, scale: 0.3 },
+                          { rotation: 0,    opacity: 1, scale: 1,   duration: 0.5, ease: 'back.out(1.5)' });
+      },
+      // Skew slam
+      (swap) => {
+        gsap.timeline()
+          .to(wordEl, { skewX: 30, x: 40, opacity: 0, duration: 0.28, ease: 'power2.in' })
+          .call(swap)
+          .fromTo(wordEl, { skewX: -30, x: -40, opacity: 0 },
+                          { skewX: 0,   x: 0,   opacity: 1, duration: 0.45, ease: 'elastic.out(1, 0.6)' });
+      },
+    ];
+
+    let lastIdx = -1;
+
+    function nextWord() {
+      current = (current + 1) % words.length;
+
+      // Pick a random animation, never repeat the same one twice in a row
+      let idx;
+      do { idx = Math.floor(Math.random() * animations.length); } while (idx === lastIdx);
+      lastIdx = idx;
+
+      animations[idx](() => { wordEl.textContent = words[current]; });
+    }
+
+    setInterval(nextWord, 5000);
+  })();
+</script>
 
 </body>
 </html>

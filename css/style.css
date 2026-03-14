@@ -129,7 +129,7 @@ header {
 
 header h1 {
   font-family: "Fredoka", sans-serif;
-  font-size: clamp(2rem, 6vw, 3.4rem);
+  font-size: clamp(2rem, 6vw, 6rem);
   color: var(--y2k-pink);
   letter-spacing: 2px;
   font-weight: 700;
@@ -138,6 +138,10 @@ header h1 {
   text-shadow:
     3px 3px 0 var(--y2k-black),
     6px 6px 0 rgba(0,0,0,0.15);
+  display: inline-block;
+}
+
+#wheel-word {
   display: inline-block;
 }
 
