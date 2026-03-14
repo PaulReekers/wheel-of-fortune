@@ -115,93 +115,62 @@
 <!-- Word transition animation -->
 <script>
   (function () {
-    const words   = ['Terror', 'Doom', 'Fortune', 'Fun', 'Names', 'Destiny', 'Fate', 'Chaos', 'Misfortune', 'Regret', 'Awkward', 'Madness', 'Anxiety', 'Misfortune', 'Confusion', 'Heroes', 'Legends', 'Mystery', 'Wonders', 'Volunteers', 'Courage', 'Ideas'];
-    let   current = 0;
-    const wordEl  = document.getElementById('wheel-word');
+    const words  = ['Terror', 'Doom', 'Fortune', 'Fun', 'Names', 'Destiny', 'Fate', 'Chaos', 'Misfortune', 'Regret', 'Awkward', 'Madness', 'Anxiety', 'Misfortune', 'Confusion', 'Heroes', 'Legends', 'Mystery', 'Wonders', 'Volunteers', 'Courage', 'Ideas'];
+    let  current = 0;
+    const wordEl = document.getElementById('wheel-word');
 
-    // Only the word span animates — "Wheel of" stays put
-    gsap.set(wordEl, { transformPerspective: 600 });
+    // perspective is set via CSS on <header> so clearProps won't break 3D flips
 
-    // Each animation: exit wordEl → swap text → enter wordEl
-    const animations = [
-      // Flip X — departure board
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { rotationX: 90, opacity: 0, duration: 0.28, ease: 'power2.in', transformOrigin: '50% 100%' })
-          .call(swap)
-          .fromTo(wordEl, { rotationX: -90, opacity: 0, transformOrigin: '50% 0%' },
-                          { rotationX: 0,   opacity: 1, duration: 0.4, ease: 'back.out(1.5)' });
-      },
-      // Flip Y — side door
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { rotationY: 90, opacity: 0, duration: 0.28, ease: 'power2.in', transformOrigin: '100% 50%' })
-          .call(swap)
-          .fromTo(wordEl, { rotationY: -90, opacity: 0, transformOrigin: '0% 50%' },
-                          { rotationY: 0,   opacity: 1, duration: 0.4, ease: 'back.out(1.5)' });
-      },
-      // Zoom collapse + elastic pop
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { scale: 0, opacity: 0, duration: 0.3, ease: 'back.in(2)' })
-          .call(swap)
-          .fromTo(wordEl, { scale: 0, opacity: 0 },
-                          { scale: 1, opacity: 1, duration: 0.55, ease: 'elastic.out(1, 0.5)' });
-      },
-      // Slide up
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { y: -40, opacity: 0, duration: 0.28, ease: 'power2.in' })
-          .call(swap)
-          .fromTo(wordEl, { y: 40, opacity: 0 },
-                          { y: 0,  opacity: 1, duration: 0.4, ease: 'back.out(1.5)' });
-      },
-      // Slide left
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { x: -60, opacity: 0, duration: 0.28, ease: 'power2.in' })
-          .call(swap)
-          .fromTo(wordEl, { x: 60, opacity: 0 },
-                          { x: 0,  opacity: 1, duration: 0.4, ease: 'back.out(1.2)' });
-      },
-      // Shake + fade
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { x: 10, duration: 0.05, ease: 'none', repeat: 5, yoyo: true })
-          .to(wordEl, { x: 0, opacity: 0, duration: 0.12 }, '<0.2')
-          .call(swap)
-          .fromTo(wordEl, { opacity: 0, scale: 1.2 },
-                          { opacity: 1, scale: 1,  duration: 0.4, ease: 'back.out(2)' });
-      },
-      // Full spin
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { rotation: 180, opacity: 0, scale: 0.3, duration: 0.35, ease: 'power2.in' })
-          .call(swap)
-          .fromTo(wordEl, { rotation: -180, opacity: 0, scale: 0.3 },
-                          { rotation: 0,    opacity: 1, scale: 1,   duration: 0.5, ease: 'back.out(1.5)' });
-      },
-      // Skew slam
-      (swap) => {
-        gsap.timeline()
-          .to(wordEl, { skewX: 30, x: 40, opacity: 0, duration: 0.28, ease: 'power2.in' })
-          .call(swap)
-          .fromTo(wordEl, { skewX: -30, x: -40, opacity: 0 },
-                          { skewX: 0,   x: 0,   opacity: 1, duration: 0.45, ease: 'elastic.out(1, 0.6)' });
-      },
+    // ── EXIT animations (visible → invisible, fires onComplete callback) ──
+    const exits = [
+      (done) => gsap.to(wordEl, { rotationX:  90, opacity: 0, duration: 0.4,  ease: 'power2.in', transformOrigin: '50% 100%', onComplete: done }),
+      (done) => gsap.to(wordEl, { rotationY:  90, opacity: 0, duration: 0.4,  ease: 'power2.in', transformOrigin: '100% 50%', onComplete: done }),
+      (done) => gsap.to(wordEl, { scale:       0, opacity: 0, duration: 0.35, ease: 'back.in(2)', onComplete: done }),
+      (done) => gsap.to(wordEl, { y:         -44, opacity: 0, duration: 0.38, ease: 'power2.in', onComplete: done }),
+      (done) => gsap.to(wordEl, { x:         -60, opacity: 0, duration: 0.38, ease: 'power2.in', onComplete: done }),
+      (done) => gsap.timeline({ onComplete: done })
+                  .to(wordEl, { x: 10, duration: 0.05, ease: 'none', repeat: 5, yoyo: true })
+                  .to(wordEl, { x: 0,  opacity: 0, duration: 0.22 }),
+      (done) => gsap.to(wordEl, { rotation: 180, scale: 0.3, opacity: 0, duration: 0.4, ease: 'power2.in', onComplete: done }),
+      (done) => gsap.to(wordEl, { skewX:  30, x:  40, opacity: 0, duration: 0.38, ease: 'power2.in', onComplete: done }),
     ];
 
-    let lastIdx = -1;
+    // ── ENTRY animations (invisible → visible) ──
+    const entries = [
+      () => gsap.fromTo(wordEl, { rotationX: -90, opacity: 0, transformOrigin: '50% 0%'  }, { rotationX: 0,   opacity: 1, duration: 0.45, ease: 'back.out(1.5)' }),
+      () => gsap.fromTo(wordEl, { rotationY: -90, opacity: 0, transformOrigin: '0% 50%'  }, { rotationY: 0,   opacity: 1, duration: 0.45, ease: 'back.out(1.5)' }),
+      () => gsap.fromTo(wordEl, { scale:       0, opacity: 0 },                              { scale:     1,   opacity: 1, duration: 0.55, ease: 'elastic.out(1, 0.5)' }),
+      () => gsap.fromTo(wordEl, { y:          44, opacity: 0 },                              { y:         0,   opacity: 1, duration: 0.45, ease: 'back.out(1.5)' }),
+      () => gsap.fromTo(wordEl, { x:          60, opacity: 0 },                              { x:         0,   opacity: 1, duration: 0.45, ease: 'back.out(1.2)' }),
+      () => gsap.fromTo(wordEl, { scale:     1.2, opacity: 0 },                              { scale:     1,   opacity: 1, duration: 0.45, ease: 'back.out(2)' }),
+      () => gsap.fromTo(wordEl, { rotation: -180, scale: 0.3, opacity: 0 },                  { rotation:  0,   scale:  1, opacity: 1, duration: 0.5, ease: 'back.out(1.5)' }),
+      () => gsap.fromTo(wordEl, { skewX:     -30, x: -40, opacity: 0 },                      { skewX:     0,   x:      0, opacity: 1, duration: 0.5, ease: 'elastic.out(1, 0.6)' }),
+    ];
+
+    function rand(arr, last) {
+      let i;
+      do { i = Math.floor(Math.random() * arr.length); } while (i === last);
+      return i;
+    }
+
+    let lastExit  = -1;
+    let lastEntry = -1;
 
     function nextWord() {
       current = (current + 1) % words.length;
 
-      // Pick a random animation, never repeat the same one twice in a row
-      let idx;
-      do { idx = Math.floor(Math.random() * animations.length); } while (idx === lastIdx);
-      lastIdx = idx;
+      const exitIdx  = rand(exits,   lastExit);
+      const entryIdx = rand(entries, lastEntry);
+      lastExit  = exitIdx;
+      lastEntry = entryIdx;
 
-      animations[idx](() => { wordEl.textContent = words[current]; });
+      gsap.killTweensOf(wordEl);
+      exits[exitIdx](() => {
+        wordEl.textContent = words[current];
+        // Reset leftover transforms before entry (opacity stays 0 — cleared by entry's fromTo)
+        gsap.set(wordEl, { clearProps: 'transform' });
+        entries[entryIdx]();
+      });
     }
 
     setInterval(nextWord, 5000);

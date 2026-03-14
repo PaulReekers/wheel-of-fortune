@@ -125,6 +125,7 @@ body {
 header {
   text-align: center;
   padding: 32px 20px 16px;
+  perspective: 600px;
 }
 
 header h1 {
@@ -144,6 +145,7 @@ header h1 {
 
 #wheel-word {
   display: inline-block;
+  will-change: transform, opacity;
 }
 
 header p {
