@@ -1,38 +1,42 @@
-# 🎡 Wheel of Fortune
+# Wheel of Terror
 
-An interactive, browser-based Wheel of Fortune built with plain HTML, CSS, and JavaScript — no frameworks, no build tools, no dependencies.
+An interactive, browser-based name-picker wheel built with plain HTML, CSS, and JavaScript — no frameworks, no build tools. Just open and spin.
 
 ---
 
-## 📸 Preview
+## Preview
 
 > Open `index.html` via a local server (see [Getting Started](#getting-started)) and spin the wheel!
 
 ---
 
-## ✨ Features
+## Features
 
-- 🎯 Spin the wheel and land on a random participant
-- ➕ Add names one by one or paste an entire list at once
-- 🗑️ Remove individual names from the list
-- ✅ Track past participants — see who has already been picked
-- 💾 All data is saved in **localStorage** (persists after refresh)
-- 📱 Fully **responsive** — works on desktop and mobile
+- **Spin the wheel** — lands on a randomly chosen participant with a satisfying ease-out animation
+- **Tick sounds** — synthesised click audio fires on every segment crossing, fading as the wheel slows
+- **Confetti burst** — canvas-based confetti rains down when the winner is revealed
+- **Add names** one by one or paste an entire list at once (bulk add)
+- **Remove names** individually from the list
+- **Winner history** — past picks are tracked with their segment colour
+- **Persisted in localStorage** — names, past candidates and winner history survive a page refresh
+- **Y2K / dopamine colour palette** — all visual tokens live in CSS custom properties
+- **Responsive** — full-screen slide-up panel on mobile, fixed side panel on desktop
+- **Hamburger toggle** — GSAP-animated panel open/close with a backdrop, adapts per breakpoint via `gsap.matchMedia()`
 
 ---
 
-## 📁 File Structure
+## File Structure
 
 ```
 wheel-of-fortune/
 │
-├── index.html              ← Page structure (HTML only)
+├── index.html              ← Page structure + inline GSAP animation IIFEs
 │
 ├── css/
-│   └── style.css           ← All styling
+│   └── style.css           ← All styling (design tokens, layout, responsive)
 │
 ├── js/
-│   └── app.js              ← All logic and interactivity
+│   └── app.js              ← All wheel logic (class-based, no framework)
 │
 ├── favicon.ico             ← Browser tab icon
 ├── favicon.svg
@@ -46,23 +50,20 @@ wheel-of-fortune/
 └── README.md               ← You are here
 ```
 
-> **Why split into separate files?**
-> Keeping HTML, CSS, and JavaScript in separate files makes the code easier to read, maintain, and debug. Each file has one clear responsibility.
-
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
-Because the app uses **external files** (CSS and JS linked via `<link>` and `<script src="">`), it must be served through a local web server. Opening `index.html` directly as a file (`file://`) won't work correctly.
+The app links external CSS and JS files, so it must be served via a local web server — opening `index.html` directly as `file://` won't work.
 
-### Option 1 — Python (built into macOS/Linux)
+### Option 1 — Python (built into macOS / Linux)
 
 ```bash
 cd wheel-of-fortune
 python3 -m http.server 8080
 ```
 
-Then open [http://localhost:8080](http://localhost:8080) in your browser.
+Open [http://localhost:8080](http://localhost:8080).
 
 ### Option 2 — VS Code Live Server
 
@@ -77,118 +78,150 @@ npx serve .
 
 ---
 
-## 🧠 How It Works
+## Architecture
 
 ### HTML (`index.html`)
-The HTML file only contains **structure** — no styling or logic. It defines:
-- The page header
-- The canvas element where the wheel is drawn
-- The names panel with input fields
-- The winner modal (hidden by default)
+
+Pure structure — no inline styles or logic. Contains:
+
+- Page header with the animated title word
+- Canvas element for the wheel
+- Names panel (candidates list, bulk-add textarea)
+- Hamburger button + backdrop overlay (panel toggle)
+- Winner modal
+- Confetti canvas
+- Three inline `<script>` IIFEs loaded after GSAP:
+  - **Hamburger / panel toggle** — `gsap.matchMedia()` contexts for desktop and mobile
+  - **Word transition** — rotating GSAP entrance/exit animations on the header subtitle
 
 ### CSS (`css/style.css`)
-The stylesheet handles all **visual design**:
-- Layout using **Flexbox**
-- Animations with `@keyframes`
-- Responsive design using `@media` queries
-- CSS custom states like `.overlay.open` and `.past-section.visible`
+
+All design lives here. Key sections:
+
+| Section | What it controls |
+|---|---|
+| `:root` design tokens | Colour palette, canvas values, pointer geometry |
+| Layout | Flexbox-based page structure |
+| Wheel | Canvas sizing, pointer, spin-hint pill |
+| Names panel | Fixed side panel (desktop) / full-screen drawer (mobile) |
+| Hamburger | Fixed toggle button, bar styling |
+| Panel backdrop | Dark overlay behind the open panel |
+| Winner modal | Pop-in animation, buttons |
+| Confetti canvas | Full-screen fixed overlay |
+| `@media (max-width: 768px)` | Full-screen panel, stacked layout |
+
+Visual values (colours, sizes, spacing) are defined as CSS custom properties on `:root` and read by JavaScript via `getComputedStyle` — the stylesheet is the single source of truth for all visual tokens.
 
 ### JavaScript (`js/app.js`)
-The JavaScript handles all **interactivity and logic**, split into clear sections:
 
-| Section | What it does |
+Class-based, no framework. Four classes assembled in a bootstrap IIFE:
+
+| Class | Responsibility |
 |---|---|
-| `CONSTANTS` | Colour palette for wheel segments |
-| `STATE` | Variables that track the current app state |
-| `INIT` | Runs once on page load to set everything up |
-| `DATA` | Add, remove and save names to localStorage |
-| `BULK ADD` | Paste and process a list of names at once |
-| `LIST UI` | Render the names list in the sidebar |
-| `CANVAS DRAW` | Draw the wheel using the HTML `<canvas>` API |
-| `SPIN` | Animate the wheel and determine the winner |
-| `MODAL` | Show and hide the winner popup |
-| `PAST PARTICIPANTS` | Track and display who has already been picked |
+| `Theme` | Reads all CSS custom properties into a plain object for use by the Canvas API |
+| `AudioManager` | Lazy Web Audio context; synthesises a noise-burst click on each segment crossing |
+| `WheelRenderer` | Stateless — draws segments, labels, hub, outer ring and pointer onto the canvas |
+| `Confetti` | Canvas-based particle system triggered on winner reveal |
+| `WheelApp` | Owns all mutable state; orchestrates persistence, events, resize and spin logic |
 
 ---
 
-## 🎨 The Canvas Wheel
+## Canvas Wheel
 
-The wheel is drawn using the **HTML Canvas API** — a built-in browser feature for drawing shapes and graphics with JavaScript.
+The wheel is drawn with the **HTML Canvas 2D API**.
 
 ```
-canvas.getContext('2d')  →  gives access to drawing tools
-ctx.arc()                →  draws a curved line (used for segments)
-ctx.fillStyle            →  sets the fill colour
-ctx.rotate()             →  rotates the drawing context for text
+canvas.getContext('2d')  →  drawing context
+ctx.arc()                →  segment arcs
+ctx.rotate()             →  rotated text labels
+ctx.translate()          →  origin shifts for hub / pointer
 ```
 
-Each segment is calculated based on the number of names:
+Each segment angle:
 
 ```js
 const segmentAngle = (2 * Math.PI) / names.length;
 ```
 
-`2 * Math.PI` = one full circle in **radians** (≈ 6.28). Dividing by the number of names gives the angle for each segment.
+`2 * Math.PI` = one full circle in radians (~6.28). The wheel radius fills the canvas to the edge; only the ring stroke and pointer tip need a few pixels of clearance (`margin: 4` in `CONFIG`).
 
 ---
 
-## 🌀 The Spin Animation
+## Spin Animation
 
-The spin uses `requestAnimationFrame` — the browser's built-in animation loop — combined with an **easing function** to make the wheel slow down gradually.
+Uses `requestAnimationFrame` with an **ease-out cubic** curve so the wheel decelerates naturally:
 
 ```js
-// Ease-out cubic: starts fast, ends slow
 const eased = 1 - Math.pow(1 - progress, 3);
 ```
 
-The winner is chosen **before** the animation starts. The wheel then rotates to land exactly on that person's segment.
+The winner is chosen **before** the animation starts. The target angle is calculated so the winner's segment centre lands exactly at the pointer position when the animation ends.
 
 ---
 
-## 💾 localStorage
+## Audio
 
-`localStorage` is a simple browser-based key/value store. Data saved here survives page refreshes.
+The Web Audio API synthesises a short noise burst (no audio files needed):
 
-```js
-// Save
-localStorage.setItem('key', JSON.stringify(data));
-
-// Load
-const data = JSON.parse(localStorage.getItem('key') || '[]');
-```
-
-This app uses two keys:
-- `wof_names_v1` — the current list of participants
-- `wof_removed_v1` — the list of past participants
+- White noise shaped with an exponential decay → crisp click
+- High-pass filter removes low-frequency rumble
+- Volume fades from `1.0` → `volumeMin` as the wheel slows
+- Up to `maxCrossings` ticks per frame, staggered by `staggerMs` to avoid clicks overlapping
 
 ---
 
-## 🛠️ Possible Improvements
+## Hamburger Panel
 
-Looking to extend this project? Here are some ideas:
+Managed by `gsap.matchMedia()` with two separate contexts:
 
-- [ ] Add a **confetti animation** when the winner is shown
+| Breakpoint | Panel behaviour | Easing |
+|---|---|---|
+| `≥ 769 px` (desktop) | Slides in from right (`xPercent 110 → 0`) | `back.out(1.4)` |
+| `≤ 768 px` (mobile) | Rises full-screen from bottom (`yPercent 100 → 0`) | `power2.out` |
+
+When the viewport crosses the breakpoint, GSAP automatically calls the cleanup function, which kills the old timeline, clears inline transforms and resets the hamburger icon.
+
+The CSS uses the standalone `translate` property (separate from `transform`) for the desktop vertical-centring trick, so GSAP's `transform` management never conflicts with it.
+
+---
+
+## localStorage
+
+Three keys are used:
+
+| Key | Content |
+|---|---|
+| `wof_names_v1` | Current list of participants (`string[]`) |
+| `wof_removed_v1` | Names removed after being picked (`string[]`) |
+| `wof_winners_v1` | Winner history with segment colour (`{name, color}[]`) |
+
+---
+
+## Possible Improvements
+
 - [ ] Let users **customise colours** per segment
-- [ ] Add a **sound effect** when spinning
 - [ ] Allow **importing** a `.txt` or `.csv` file with names
-- [ ] Add a **dark/light mode** toggle
-- [ ] Make the app **installable** as a PWA (the `site.webmanifest` is already in place!)
+- [ ] Add a **dark / light mode** toggle
+- [ ] Make the app **installable** as a PWA (the `site.webmanifest` is already in place)
+- [ ] Add a **spin count** or statistics view
 
 ---
 
-## 🧰 Built With
+## Built With
 
 | Technology | Purpose |
 |---|---|
 | HTML5 | Page structure |
-| CSS3 | Styling and animations |
-| JavaScript (ES6+) | Logic and interactivity |
-| Canvas API | Drawing the wheel |
-| localStorage | Persisting data |
-| RealFaviconGenerator | Favicon across all platforms |
+| CSS3 | Styling, design tokens, responsive layout |
+| JavaScript ES2020+ | Logic, interactivity, class-based architecture |
+| Canvas API | Drawing the wheel and confetti |
+| Web Audio API | Synthesised tick sounds |
+| GSAP 3 | Panel animations, `matchMedia` breakpoint handling, header word transitions |
+| localStorage | Persisting names, removed candidates and winner history |
+| Google Fonts | Fredoka + Nunito typefaces |
 
 ---
 
-## 📄 License
+## License
 
 Free to use for educational purposes.
