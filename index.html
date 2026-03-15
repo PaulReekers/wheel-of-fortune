@@ -23,6 +23,16 @@
 </head>
 <body>
 
+<!-- Hamburger toggle (mobile) -->
+<button class="hamburger" id="hamburger" aria-label="Toggle candidates panel" aria-expanded="false">
+  <span></span>
+  <span></span>
+  <span></span>
+</button>
+
+<!-- Backdrop — closes panel on outside tap -->
+<div class="panel-backdrop" id="panelBackdrop"></div>
+
 <header>
   <h1>Wheel of <span id="wheel-word">Terror</span></h1>
   <p>Add names and spin the wheel!</p>
@@ -112,6 +122,56 @@
 
 <!-- JavaScript -->
 <script src="js/app.js"></script>
+
+<!-- Hamburger / panel toggle -->
+<script>
+  (function () {
+    const btn      = document.getElementById('hamburger');
+    const panel    = document.querySelector('.names-panel');
+    const backdrop = document.getElementById('panelBackdrop');
+    const bars     = btn.querySelectorAll('span');
+
+    let isOpen = false;
+
+    // ── Panel: slides in from the right with a slight settle rotation ──
+    const panelTl = gsap.timeline({ paused: true })
+      .fromTo(panel,
+        { xPercent: 110, rotation: 5 },
+        { xPercent: 0,   rotation: 0, duration: 0.55, ease: 'back.out(1.4)' }, 0)
+      .fromTo(backdrop,
+        { autoAlpha: 0 },
+        { autoAlpha: 1, duration: 0.35, ease: 'power2.out' }, 0);
+
+    // ── Hamburger: three bars morph into an × ──
+    // bar height 3px + gap 6px → centers are 9 px apart
+    const barTl = gsap.timeline({ paused: true })
+      .to(bars[0], { y:  9, rotation:  45, duration: 0.3, ease: 'power2.inOut' }, 0)
+      .to(bars[1], { scaleX: 0, opacity: 0, duration: 0.2, ease: 'power2.inOut' }, 0)
+      .to(bars[2], { y: -9, rotation: -45, duration: 0.3, ease: 'power2.inOut' }, 0);
+
+    function toggle() {
+      isOpen = !isOpen;
+      btn.setAttribute('aria-expanded', isOpen);
+      if (isOpen) { panelTl.play();    barTl.play();    }
+      else        { panelTl.reverse(); barTl.reverse(); }
+    }
+
+    btn.addEventListener('click', toggle);
+    backdrop.addEventListener('click', toggle);
+
+    // ── Reset when resizing back to desktop ──
+    const mq = window.matchMedia('(max-width: 680px)');
+    mq.addEventListener('change', e => {
+      if (!e.matches) {
+        panelTl.progress(0).pause();
+        barTl.progress(0).pause();
+        gsap.set([panel, backdrop], { clearProps: 'all' });
+        isOpen = false;
+        btn.setAttribute('aria-expanded', false);
+      }
+    });
+  })();
+</script>
 
 <!-- Word transition animation -->
 <script>
