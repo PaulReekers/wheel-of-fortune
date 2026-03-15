@@ -381,6 +381,97 @@ class WheelRenderer {
   }
 }
 
+/* ── CONFETTI ────────────────────────────────────────────────────────────────
+   Canvas-based confetti burst triggered when a winner is revealed.
+────────────────────────────────────────────────────────────────────────────── */
+
+class Confetti {
+  constructor(canvas) {
+    this._canvas = canvas;
+    this._ctx    = canvas.getContext('2d');
+    this._raf    = null;
+    this._particles = [];
+    this._colors = ['#FF3BA7','#00E5FF','#3DDE4C','#FF6B35','#BF5FFF','#FFE600','#FF0099','#00FF87','#FF4500','#7B2FFF'];
+  }
+
+  start() {
+    this._canvas.width  = window.innerWidth;
+    this._canvas.height = window.innerHeight;
+    this._particles = Array.from({ length: 160 }, () => this._spawn());
+    this._canvas.style.display = 'block';
+    if (this._raf) cancelAnimationFrame(this._raf);
+    const tick = () => {
+      this._draw();
+      if (this._particles.length > 0) {
+        this._raf = requestAnimationFrame(tick);
+      } else {
+        this._canvas.style.display = 'none';
+        this._raf = null;
+      }
+    };
+    this._raf = requestAnimationFrame(tick);
+  }
+
+  stop() {
+    if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
+    this._ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
+    this._canvas.style.display = 'none';
+    this._particles = [];
+  }
+
+  _spawn() {
+    const color = this._colors[Math.floor(Math.random() * this._colors.length)];
+    return {
+      x:    Math.random() * window.innerWidth,
+      y:    -10 - Math.random() * 120,
+      vx:   (Math.random() - 0.5) * 5,
+      vy:   1.5 + Math.random() * 4,
+      rot:  Math.random() * 360,
+      rotV: (Math.random() - 0.5) * 12,
+      w:    6 + Math.random() * 10,
+      h:    4 + Math.random() * 6,
+      color,
+      round: Math.random() > 0.65,
+      alpha: 1,
+      life:  1,
+      decay: 0.004 + Math.random() * 0.004,
+    };
+  }
+
+  _draw() {
+    const { width: W, height: H } = this._canvas;
+    this._ctx.clearRect(0, 0, W, H);
+
+    this._particles = this._particles.filter(p => p.alpha > 0.05 && p.y < H + 30);
+
+    for (const p of this._particles) {
+      p.x   += p.vx;
+      p.y   += p.vy;
+      p.vy  += 0.09;  // gravity
+      p.vx  *= 0.992; // air resistance
+      p.rot += p.rotV;
+      p.life  -= p.decay;
+      p.alpha  = Math.max(0, p.life);
+
+      this._ctx.save();
+      this._ctx.globalAlpha = p.alpha;
+      this._ctx.translate(p.x, p.y);
+      this._ctx.rotate((p.rot * Math.PI) / 180);
+      this._ctx.fillStyle = p.color;
+
+      if (p.round) {
+        this._ctx.beginPath();
+        this._ctx.arc(0, 0, p.w / 2, 0, Math.PI * 2);
+        this._ctx.fill();
+      } else {
+        this._ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      }
+
+      this._ctx.restore();
+    }
+  }
+}
+
 /* ── WHEEL APP ───────────────────────────────────────────────────────────────
    Orchestrates state, persistence, events, and rendering.
    The only class that mutates application state.
@@ -395,12 +486,13 @@ class WheelApp {
    * @param {Theme}         deps.theme
    * @param {object}        deps.config    Full CONFIG object
    */
-  constructor({ dom, renderer, audio, theme, config }) {
+  constructor({ dom, renderer, audio, theme, config, confetti }) {
     this._dom      = dom;
     this._renderer = renderer;
     this._audio    = audio;
     this._theme    = theme;
     this._cfg      = config;
+    this._confetti = confetti;
 
     // ── Application state ──────────────────────────────────────────────────
     this._names      = [];
@@ -758,9 +850,11 @@ class WheelApp {
     this._dom.modalName.style.color        = color || '';
     this._dom.btnClose.style.background    = color || '';
     this._dom.overlay.classList.add('open');
+    this._confetti.start();
   }
 
   _closeModal() {
+    this._confetti.stop();
     this._dom.overlay.classList.remove('open');
     this._startIdleRotation(); // wheel resumes slow rotation once popup is dismissed
   }
@@ -827,7 +921,8 @@ class WheelApp {
   const theme    = new Theme();
   const renderer = new WheelRenderer(dom.canvas, theme, CONFIG);
   const audio    = new AudioManager(CONFIG);
-  const app      = new WheelApp({ dom, renderer, audio, theme, config: CONFIG });
+  const confetti = new Confetti(document.getElementById('confetti-canvas'));
+  const app      = new WheelApp({ dom, renderer, audio, theme, config: CONFIG, confetti });
 
   app.init();
 })();
