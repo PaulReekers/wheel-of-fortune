@@ -30,9 +30,6 @@
   <span></span>
 </button>
 
-<!-- Backdrop — closes panel on outside tap -->
-<div class="panel-backdrop" id="panelBackdrop"></div>
-
 <header>
   <h1>Wheel of <span id="wheel-word">Terror</span></h1>
   <p>Add names and spin the wheel!</p>
@@ -128,7 +125,6 @@
   (function () {
     const btn      = document.getElementById('hamburger');
     const panel    = document.querySelector('.names-panel');
-    const backdrop = document.getElementById('panelBackdrop');
     const bars     = btn.querySelectorAll('span');
 
     let isOpen  = false;
@@ -156,7 +152,6 @@
     }
 
     btn.addEventListener('click',     () => isOpen ? closePanel() : openPanel());
-    backdrop.addEventListener('click', () => { if (isOpen) closePanel(); });
 
     // ── Shared cleanup — returned from every matchMedia context ───────────
     // GSAP calls this automatically when a media query stops matching,
@@ -164,7 +159,6 @@
     function cleanup() {
       panelTl?.kill();
       panelTl = null;
-      gsap.set([panel, backdrop], { clearProps: 'all' });
       if (isOpen) {
         barTl.progress(0).pause();
         btn.setAttribute('aria-expanded', false);
@@ -180,11 +174,9 @@
     // of GSAP's transform, so xPercent alone drives the slide.
     mm.add('(min-width: 769px)', () => {
       gsap.set(panel,    { xPercent: 110 });
-      gsap.set(backdrop, { autoAlpha: 0  });
 
       panelTl = gsap.timeline({ paused: true })
-        .to(panel,    { xPercent: 0, duration: 0.55, ease: 'back.out(1.4)' }, 0)
-        .to(backdrop, { autoAlpha: 1, duration: 0.35, ease: 'power2.out'  }, 0);
+        .to(panel,    { xPercent: 0, duration: 0.55, ease: 'back.out(1.4)' }, 0);
 
       return cleanup;
     });
@@ -192,11 +184,9 @@
     // Mobile (≤ 768 px): full-screen panel rises from below the viewport
     mm.add('(max-width: 768px)', () => {
       gsap.set(panel,    { yPercent: 100 });
-      gsap.set(backdrop, { autoAlpha: 0  });
 
       panelTl = gsap.timeline({ paused: true })
-        .to(panel,    { yPercent: 0, duration: 0.4, ease: 'power2.out' }, 0)
-        .to(backdrop, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, 0);
+        .to(panel,    { yPercent: 0, duration: 0.4, ease: 'power2.out' }, 0);
 
       return cleanup;
     });

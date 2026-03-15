@@ -547,16 +547,6 @@ header p {
   pointer-events: none;
 }
 
-/* ── PANEL BACKDROP ── */
-.panel-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(26, 26, 26, 0.45);
-  z-index: 340;
-  visibility: hidden;  /* GSAP autoAlpha manages opacity + visibility */
-  opacity: 0;
-}
-
 /* ── CONFETTI ── */
 #confetti-canvas {
   display: none;
