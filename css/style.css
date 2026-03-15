@@ -239,7 +239,7 @@ header p {
   position: fixed;
   right: -2px;
   top: 50%;
-  transform: translateY(-50%);
+  translate: 0 -50%;   /* standalone property — GSAP's transform won't clobber this */
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   z-index: 100;
@@ -547,6 +547,16 @@ header p {
   pointer-events: none;
 }
 
+/* ── PANEL BACKDROP ── */
+.panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(26, 26, 26, 0.45);
+  z-index: 340;
+  visibility: hidden;  /* GSAP autoAlpha manages opacity + visibility */
+  opacity: 0;
+}
+
 /* ── CONFETTI ── */
 #confetti-canvas {
   display: none;
@@ -746,7 +756,7 @@ header p {
 }
 
 /* ── RESPONSIVE ── */
-@media (max-width: 680px) {
+@media (max-width: 768px) {
   .main {
     flex-direction: column;
     align-items: center;
@@ -754,20 +764,17 @@ header p {
     min-height: auto;
   }
 
-  /* Show hamburger button */
-  .hamburger { display: flex; }
-
-  /* Panel becomes a full-height off-canvas drawer on the right.
-     GSAP controls the transform (xPercent / rotation) at runtime. */
+  /* Full-screen drawer — GSAP controls yPercent at runtime */
   .names-panel {
     position: fixed;
     right: 0;
     top: 0;
-    width: min(300px, 88vw);
-    height: 100%;
-    max-height: 100%;
+    translate: none;       /* disable desktop vertical-centering trick */
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
     overflow-y: auto;
-    border-radius: 20px 0 0 20px;
+    border-radius: 0;
     z-index: 350;
   }
 

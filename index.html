@@ -131,44 +131,74 @@
     const backdrop = document.getElementById('panelBackdrop');
     const bars     = btn.querySelectorAll('span');
 
-    let isOpen = false;
+    let isOpen  = false;
+    let panelTl = null; // reassigned per breakpoint by gsap.matchMedia
 
-    // ── Panel: slides in from the right with a slight settle rotation ──
-    const panelTl = gsap.timeline({ paused: true })
-      .fromTo(panel,
-        { xPercent: 110, rotation: 5 },
-        { xPercent: 0,   rotation: 0, duration: 0.55, ease: 'back.out(1.4)' }, 0)
-      .fromTo(backdrop,
-        { autoAlpha: 0 },
-        { autoAlpha: 1, duration: 0.35, ease: 'power2.out' }, 0);
-
-    // ── Hamburger: three bars morph into an × ──
-    // bar height 3px + gap 6px → centers are 9 px apart
+    // ── Hamburger bars → × (identical on every screen size) ──────────────
+    // bar height 3 px + gap 6 px → centres are 9 px apart
     const barTl = gsap.timeline({ paused: true })
       .to(bars[0], { y:  9, rotation:  45, duration: 0.3, ease: 'power2.inOut' }, 0)
       .to(bars[1], { scaleX: 0, opacity: 0, duration: 0.2, ease: 'power2.inOut' }, 0)
       .to(bars[2], { y: -9, rotation: -45, duration: 0.3, ease: 'power2.inOut' }, 0);
 
-    function toggle() {
-      isOpen = !isOpen;
-      btn.setAttribute('aria-expanded', isOpen);
-      if (isOpen) { panelTl.play();    barTl.play();    }
-      else        { panelTl.reverse(); barTl.reverse(); }
+    // ── Open / close helpers ──────────────────────────────────────────────
+    function openPanel()  {
+      isOpen = true;
+      btn.setAttribute('aria-expanded', true);
+      panelTl?.play();
+      barTl.play();
+    }
+    function closePanel() {
+      isOpen = false;
+      btn.setAttribute('aria-expanded', false);
+      panelTl?.reverse();
+      barTl.reverse();
     }
 
-    btn.addEventListener('click', toggle);
-    backdrop.addEventListener('click', toggle);
+    btn.addEventListener('click',     () => isOpen ? closePanel() : openPanel());
+    backdrop.addEventListener('click', () => { if (isOpen) closePanel(); });
 
-    // ── Reset when resizing back to desktop ──
-    const mq = window.matchMedia('(max-width: 680px)');
-    mq.addEventListener('change', e => {
-      if (!e.matches) {
-        panelTl.progress(0).pause();
+    // ── Shared cleanup — returned from every matchMedia context ───────────
+    // GSAP calls this automatically when a media query stops matching,
+    // so state is always clean before the next context initialises.
+    function cleanup() {
+      panelTl?.kill();
+      panelTl = null;
+      gsap.set([panel, backdrop], { clearProps: 'all' });
+      if (isOpen) {
         barTl.progress(0).pause();
-        gsap.set([panel, backdrop], { clearProps: 'all' });
-        isOpen = false;
         btn.setAttribute('aria-expanded', false);
+        isOpen = false;
       }
+    }
+
+    // ── Responsive animation contexts ────────────────────────────────────
+    const mm = gsap.matchMedia();
+
+    // Desktop (≥ 769 px): narrow panel slides in from the right
+    // CSS translate: 0 -50% keeps the panel vertically centred independently
+    // of GSAP's transform, so xPercent alone drives the slide.
+    mm.add('(min-width: 769px)', () => {
+      gsap.set(panel,    { xPercent: 110 });
+      gsap.set(backdrop, { autoAlpha: 0  });
+
+      panelTl = gsap.timeline({ paused: true })
+        .to(panel,    { xPercent: 0, duration: 0.55, ease: 'back.out(1.4)' }, 0)
+        .to(backdrop, { autoAlpha: 1, duration: 0.35, ease: 'power2.out'  }, 0);
+
+      return cleanup;
+    });
+
+    // Mobile (≤ 768 px): full-screen panel rises from below the viewport
+    mm.add('(max-width: 768px)', () => {
+      gsap.set(panel,    { yPercent: 100 });
+      gsap.set(backdrop, { autoAlpha: 0  });
+
+      panelTl = gsap.timeline({ paused: true })
+        .to(panel,    { yPercent: 0, duration: 0.4, ease: 'power2.out' }, 0)
+        .to(backdrop, { autoAlpha: 1, duration: 0.3, ease: 'power2.out' }, 0);
+
+      return cleanup;
     });
   })();
 </script>
