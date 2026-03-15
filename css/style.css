@@ -50,7 +50,7 @@
   --wof-pointer-shadow-y:    5;
   --wof-pointer-line-width:  3;
   --wof-pointer-overlap:     36;
-  --wof-pointer-reach:       36;
+  --wof-pointer-reach:        4;
   --wof-pointer-height:      26;
 
   /* Canvas — empty state */

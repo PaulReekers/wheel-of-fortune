@@ -12,7 +12,7 @@ const CONFIG = {
     winners: 'wof_winners_v1',
   },
   canvas: {
-    margin:      48,   // px — gap between wheel rim and canvas edge (room for pointer)
+    margin:       4,   // px — just enough for ring stroke (2.5 px); wheel fills canvas
     minSize:     240,  // px — smallest the canvas will shrink to
     maxSize:     900,  // px — largest the canvas will grow to
     panelWidth:  340,  // px — desktop panel width + its margins
