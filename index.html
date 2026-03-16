@@ -11,7 +11,12 @@
   <link rel="shortcut icon" href="favicon.ico" />
   <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-title" content="Fortune" />
-  <link rel="manifest" href="site.webmanifest" />
+  <link rel="manifest" href="/site.webmanifest" />
+
+  <!-- PWA / theme -->
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
 
   <!-- Google Fonts: Nunito + Fredoka -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -120,7 +125,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/InertiaPlugin.min.js"></script>
 
 <!-- GSAP setup: plugin registration + drag-to-spin -->
-<script src="js/gsap.js?ver=1.1.0""></script>
+<script src="js/gsap.js?ver=1.1.0"></script>
 
 <!-- Application -->
 <script src="js/app.js?ver=1.1.0"></script>
@@ -261,6 +266,21 @@
 
     setInterval(nextWord, 5000);
   })();
+</script>
+
+<!-- Progressive Web App: service worker registration -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(function (reg) {
+          console.log('[SW] Registered — scope:', reg.scope);
+        })
+        .catch(function (err) {
+          console.warn('[SW] Registration failed:', err);
+        });
+    });
+  }
 </script>
 
 </body>
