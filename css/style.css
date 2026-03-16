@@ -219,10 +219,14 @@ header p {
 #wheel {
   display: block;
   border-radius: 50%;
-  cursor: pointer;
+  cursor: pointer; /* fallback cursor when drag proxy is not present */
   transition: box-shadow .35s, transform .35s cubic-bezier(.34,1.56,.64,1);
 }
 
+/* Hover ring — canvas when no proxy (fallback), proxy when Draggable is loaded.
+   The proxy is appended after #wheel in the DOM so a sibling selector can't
+   reach the canvas; instead the shadow is painted on the proxy itself, which
+   sits at inset: 0 with border-radius: 50% — visually identical. */
 #wheel:hover {
   box-shadow:
     0 0 0 5px var(--y2k-black),
@@ -233,6 +237,34 @@ header p {
 
 .wheel-wrapper[data-wheel-state="empty"]    #wheel { cursor: not-allowed; }
 .wheel-wrapper[data-wheel-state="spinning"] #wheel { cursor: default; }
+
+/* ── DRAG PROXY ── */
+/* Invisible div that GSAP Draggable rotates; canvas redraws from its delta.
+   No clip-path here — _isOnWheel() in JS handles circular hit-testing, and
+   clip-path would swallow the box-shadow on hover. */
+.wheel-drag-proxy {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  z-index: 1;
+  transition: box-shadow .35s;
+}
+
+.wheel-drag-proxy:hover {
+  box-shadow:
+    0 0 0 5px var(--y2k-black),
+    0 0 0 9px var(--y2k-green),
+    0 0 0 13px var(--y2k-black),
+    0 28px 70px rgba(0,0,0,0.32);
+}
+
+.wheel-wrapper[data-wheel-state="empty"]    .wheel-drag-proxy { cursor: not-allowed; }
+.wheel-wrapper[data-wheel-state="spinning"] .wheel-drag-proxy { cursor: default; pointer-events: none; }
+.wheel-wrapper[data-wheel-state="dragging"] .wheel-drag-proxy { cursor: grabbing; }
 
 /* ── NAMES PANEL ── */
 .names-panel {

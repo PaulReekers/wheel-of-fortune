@@ -39,6 +39,10 @@ const CONFIG = {
   idle: {
     speed: 0.00008, // rad/ms ≈ one full rotation every ~35 s
   },
+  drag: {
+    minVelocity: 100, // deg/s — minimum release speed that triggers a spin
+    historyMs:    80, // ms of drag history kept for velocity calculation
+  },
 };
 
 /* ── THEME ───────────────────────────────────────────────────────────────────
@@ -495,14 +499,16 @@ class WheelApp {
     this._confetti = confetti;
 
     // ── Application state ──────────────────────────────────────────────────
-    this._names      = [];
-    this._removed    = [];
-    this._winners    = [];
-    this._angle      = 0;
-    this._spinning   = false;
-    this._lastWinner = -1;
-    this._idleRaf    = null;
-    this._hasSpun    = false;
+    this._names        = [];
+    this._removed      = [];
+    this._winners      = [];
+    this._angle        = 0;
+    this._spinning     = false;
+    this._lastWinner   = -1;
+    this._idleRaf      = null;
+    this._hasSpun      = false;
+    this._drag         = { active: false, hasMoved: false };
+    this._suppressClick = false;
   }
 
   /** Bootstrap: load persisted data, bind events, start resize observation. */
@@ -510,6 +516,7 @@ class WheelApp {
     this._theme.load();
     this._loadFromStorage();
     this._bindEvents();
+    this._bindDragEvents(); // drag-to-spin + click-to-spin (GSAP Draggable or fallback)
     this._setupResizeObserver();
     this._renderList();
     this._renderRemoved();
@@ -565,7 +572,8 @@ class WheelApp {
     d.overlay     .addEventListener('click',   e  => { if (e.target === d.overlay) this._closeModal(); });
     d.btnClose    .addEventListener('click',   () => this._removeWinner());
     d.btnRemove   .addEventListener('click',   () => this._closeModal());
-    d.canvas      .addEventListener('click',   () => this._spin());
+    // Click-to-spin is wired in _bindDragEvents() — on the proxy when Draggable
+    // is available, or on the canvas directly as a fallback.
   }
 
   // ── Layout ────────────────────────────────────────────────────────────────
@@ -739,7 +747,8 @@ class WheelApp {
 
   _updateWheelState() {
     this._dom.wheelWrapper.dataset.wheelState =
-      this._spinning         ? 'spinning'
+      this._spinning           ? 'spinning'
+      : this._drag.active      ? 'dragging'
       : this._names.length < 2 ? 'empty'
       : 'ready';
 
@@ -873,6 +882,146 @@ class WheelApp {
     this._renderRemoved();
     this._renderer.draw(this._names, this._angle);
     this._closeModal();
+  }
+
+  // ── Drag to spin ──────────────────────────────────────────────────────────
+
+  /**
+   * Returns true when (clientX, clientY) falls inside the wheel circle.
+   * Used to reject presses in the corners of the square bounding box.
+   */
+  _isOnWheel(clientX, clientY) {
+    const rect = this._dom.canvas.getBoundingClientRect();
+    const cx   = rect.left + rect.width  / 2;
+    const cy   = rect.top  + rect.height / 2;
+    const r    = rect.width / 2 - this._cfg.canvas.margin;
+    return (clientX - cx) ** 2 + (clientY - cy) ** 2 <= r * r;
+  }
+
+  /**
+   * Wires drag-to-spin using GSAP Draggable.
+   *
+   * An invisible proxy div is placed over the canvas. GSAP rotates the proxy;
+   * `onDrag` converts the rotation delta to radians and applies it to `_angle`,
+   * then redraws the canvas. The canvas itself is never CSS-rotated, so the
+   * pointer arrow stays fixed.
+   *
+   * On release, if the trailing-window velocity exceeds `cfg.drag.minVelocity`,
+   * the existing `_spin()` function is called — the same path as the spin
+   * button — so winner selection, animation, and the winner popup all work
+   * identically regardless of how the spin was triggered.
+   *
+   * Falls back to a plain canvas click listener when Draggable is unavailable.
+   */
+  _bindDragEvents() {
+    if (typeof Draggable === 'undefined') {
+      // Graceful fallback: plain click-to-spin when Draggable did not load
+      this._dom.canvas.addEventListener('click', () => this._spin());
+      return;
+    }
+
+    const proxy = document.createElement('div');
+    proxy.className = 'wheel-drag-proxy';
+    this._dom.wheelWrapper.appendChild(proxy);
+
+    // The proxy overlays the canvas and intercepts all pointer events,
+    // so click-to-spin lives here instead of on the canvas.
+    proxy.addEventListener('click', e => {
+      if (this._suppressClick) { this._suppressClick = false; return; }
+      if (!this._isOnWheel(e.clientX, e.clientY)) return; // ignore square-corner taps
+      this._spin();
+    });
+
+    const { minVelocity, historyMs } = this._cfg.drag;
+    const self    = this;       // WheelApp ref — Draggable callbacks use 'this' for Draggable
+    let   prevRot = 0;          // degrees — proxy rotation at last onDrag frame
+    let   blockDrag = false;    // true while spinning or press was outside wheel
+    const history = [];         // [{ rot, t }] trailing window for velocity calc
+
+    Draggable.create(proxy, {
+      type: 'rotation',
+      allowNativeTouchScrolling: false,
+
+      onPress(e) {
+        // Reject presses while spinning, or outside the circular wheel area
+        if (self._spinning || !self._isOnWheel(e.clientX, e.clientY)) {
+          blockDrag = true;
+          return;
+        }
+        blockDrag = false;
+
+        // Pause idle rotation
+        if (self._idleRaf) { cancelAnimationFrame(self._idleRaf); self._idleRaf = null; }
+
+        // Reset proxy each gesture so rotation starts at 0 and prevRot stays in sync
+        gsap.set(proxy, { rotation: 0 });
+        prevRot        = 0;
+        history.length = 0;
+        history.push({ rot: 0, t: performance.now() });
+
+        self._drag.active   = true;
+        self._drag.hasMoved = false;
+        self._hasSpun       = true;
+        self._updateWheelState();
+      },
+
+      onDrag() {
+        if (blockDrag) return;
+
+        // 'this' = Draggable instance; self = WheelApp
+        const rot   = this.rotation;                       // degrees
+        const delta = (rot - prevRot) * (Math.PI / 180);  // → radians
+        prevRot     = rot;
+
+        const now    = performance.now();
+        history.push({ rot, t: now });
+        // Keep only samples within the trailing velocity window
+        const cutoff = now - historyMs;
+        while (history.length > 1 && history[0].t < cutoff) history.shift();
+
+        self._drag.hasMoved = true;
+        self._angle        += delta;
+        self._renderer.draw(self._names, self._angle);
+        self._syncSpinHint();
+      },
+
+      onDragEnd() {
+        if (blockDrag) { blockDrag = false; return; }
+
+        self._drag.active = false;
+        self._updateWheelState();
+
+        // Compute release velocity (deg/s) from the trailing history window
+        let velDeg = 0;
+        if (history.length >= 2) {
+          const first = history[0];
+          const last  = history[history.length - 1];
+          const dt    = last.t - first.t;
+          if (dt > 0) velDeg = (last.rot - first.rot) / dt * 1000;
+        }
+
+        gsap.set(proxy, { rotation: 0 }); // reset for the next gesture
+
+        if (!self._drag.hasMoved) {
+          self._startIdleRotation();
+          return;
+        }
+
+        // Always suppress the browser click that fires after pointer-up
+        // to avoid double-triggering spin after a drag gesture
+        self._suppressClick = true;
+        setTimeout(() => { self._suppressClick = false; }, 400);
+
+        if (Math.abs(velDeg) < minVelocity || self._names.length < 2) {
+          self._startIdleRotation();
+          return;
+        }
+
+        // Hand off to the same _spin() used by the button — picks winner,
+        // runs the ease-out animation, and shows the winner modal
+        self._spin();
+      },
+    });
   }
 
   // ── Past candidates ─────────────────────────────────────────────────────

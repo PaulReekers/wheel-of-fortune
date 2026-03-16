@@ -41,7 +41,7 @@
   <div class="wheel-section">
     <div class="wheel-wrapper">
       <canvas id="wheel" width="440" height="440"></canvas>
-      <div class="spin-hint"  id="spinHint">Click to spin</div>
+      <div class="spin-hint"  id="spinHint">Drag or click to spin</div>
       <div class="empty-hint" id="emptyHint">Add names to get started</div>
     </div>
   </div>
@@ -114,8 +114,15 @@
   </li>
 </template>
 
-<!-- GSAP -->
+<!-- GSAP core -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<!-- GSAP Draggable — enables drag-to-spin -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Draggable.min.js"></script>
+<script>
+  if (typeof Draggable !== 'undefined') {
+    gsap.registerPlugin(Draggable);
+  }
+</script>
 
 <!-- JavaScript -->
 <script src="js/app.js?ver=1.0.0"></script>
