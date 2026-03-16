@@ -19,7 +19,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="css/style.css?ver=1.0.0" />
+  <link rel="stylesheet" href="css/style.css?ver=1.1.0" />
 </head>
 <body>
 
@@ -114,18 +114,16 @@
   </li>
 </template>
 
-<!-- GSAP core -->
+<!-- GSAP libraries -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<!-- GSAP Draggable — enables drag-to-spin -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Draggable.min.js"></script>
-<script>
-  if (typeof Draggable !== 'undefined') {
-    gsap.registerPlugin(Draggable);
-  }
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/InertiaPlugin.min.js"></script>
 
-<!-- JavaScript -->
-<script src="js/app.js?ver=1.0.0"></script>
+<!-- GSAP setup: plugin registration + drag-to-spin -->
+<script src="js/gsap.js?ver=1.1.0""></script>
+
+<!-- Application -->
+<script src="js/app.js?ver=1.1.0"></script>
 
 <!-- Hamburger / panel toggle -->
 <script>
